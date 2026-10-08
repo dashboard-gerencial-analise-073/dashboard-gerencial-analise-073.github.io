@@ -28,10 +28,12 @@ Clique no fundo na tabela (ou nos atalhos *Rentab. mensal* / *Carteira* abaixo d
 
 A página *Comparação* também traz a rentabilidade mês a mês dos fundos selecionados (últimos 12 meses).
 
-**Fundos de mercado na Comparação:** a busca da página *Comparação* encontra, além da prateleira, ~3 mil fundos
-de mercado (recorte em `pipeline/config.py → MERCADO`: abertos, não exclusivos, PL ≥ R$ 10 mi, ≥ 100 cotistas).
+**Fundos de mercado na Comparação:** a busca da página *Comparação* encontra, além da prateleira, ~7 mil fundos
+de mercado (recorte em `pipeline/config.py → MERCADO`: abertos, não exclusivos, PL ≥ R$ 10 mi, ≥ 100 cotistas;
+fundos de previdência — PGBL/VGBL, cujo cotista é a seguradora — entram só pelo critério de PL). A opção
+"Só previdência" filtra a busca.
 Mesma metodologia, mas sem dados comerciais (taxas, liquidez, estratégia = N/D). As demais páginas continuam só
-com a planilha-base. A base de mercado (~40 MB em `dashboard/data/mercado/`) funciona no site e no
+com a planilha-base. A base de mercado (~95 MB em `dashboard/data/mercado/`) funciona no site e no
 `dashboard/index.html`; não é embutida no relatório em arquivo único. Para desligar: `MERCADO["ativo"] = False`.
 
 ## Versão online (GitHub Pages — sem custo)

@@ -91,6 +91,11 @@ def short_name(den):
     return " ".join(out) or den
 
 
+def is_prev(info):
+    """Fundo de previdência (FIE de PGBL/VGBL): classificação ANBIMA de previdência ou nome com PREV/PGBL/VGBL/FIE."""
+    return "Previd" in (info.get("anbima") or "") or bool(re.search(r"PREV|PGBL|VGBL|\bFIE\b", (info.get("denominacao") or "").upper()))
+
+
 # ---------------------------------------------------------------- informe diário
 def _universe(db_iso, register, base_cnpjs):
     """Classes que atendem ao recorte na data-base (inclui as reportadas só por subclasse)."""
@@ -121,7 +126,11 @@ def _universe(db_iso, register, base_cnpjs):
     chosen_sub = {}
     uni = set()
     for c, info in register.items():
-        if info["situacao"] != "Em Funcionamento Normal" or info["condominio"] == "Fechado" or info["exclusivo"] == "S":
+        prev = is_prev(info)
+        if info["situacao"] != "Em Funcionamento Normal" or info["condominio"] == "Fechado":
+            continue
+        # Previdência (FIE): o cotista é a seguradora (1 a poucos cotistas, "exclusivo"); recorte só por PL.
+        if info["exclusivo"] == "S" and not (prev and cfg.get("incluir_previdencia")):
             continue
         if c in cls:
             pl, cot = cls[c]
@@ -130,7 +139,7 @@ def _universe(db_iso, register, base_cnpjs):
             chosen_sub[c] = subs[c]["best"]
         else:
             continue
-        if pl >= cfg["pl_min"] and cot >= cfg["cotistas_min"]:
+        if pl >= cfg["pl_min"] and (cot >= cfg["cotistas_min"] or (prev and cfg.get("incluir_previdencia"))):
             uni.add(c)
     return uni | {c for c in base_cnpjs if c in register}, chosen_sub
 
@@ -228,7 +237,7 @@ def build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, base_fun
     base_cnpjs = {only_digits(f["cnpj"]) for f in base_fundos}
     uni, chosen_sub = _universe(db_iso, register, base_cnpjs)
     uni -= base_cnpjs  # fundos da planilha já estão no dataset principal (com dados comerciais)
-    log(f"  mercado: {len(uni)} fundos no recorte (PL ≥ R$ {cfg['pl_min'] / 1e6:.0f} mi, ≥ {cfg['cotistas_min']} cotistas)")
+    log(f"  mercado: {len(uni)} fundos no recorte ({sum(1 for c in uni if is_prev(register[c]))} de previdência)")
     axis_iso = [iso(d) for d in axis.dates]
     pos = {d: i for i, d in enumerate(axis_iso)}
     n = len(axis_iso)
@@ -270,7 +279,7 @@ def build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, base_fun
         if jumped:
             qc.append({"nivel": "alerta", "codigo": "SERIE_INTERROMPIDA", "mensagem": "Variação atípica de cota no histórico: série considerada só a partir dela."})
         f = {
-            "id": fid, "mercado": True, "nome": nome, "cnpj": format_cnpj(c), "gestora_id": None,
+            "id": fid, "mercado": True, "previdencia": is_prev(info), "nome": nome, "cnpj": format_cnpj(c), "gestora_id": None,
             "categoria": info["classe"] or "N/D", "familia": None, "estrutura": None, "benchmark_id": bid,
             "indicador_cvm": info["indicador"], "qualificado": (info["publico"] or "").startswith(("Qualificado", "Profissional")),
             "cvm": {"denominacao": info["denominacao"], "situacao": info["situacao"], "administrador": info["administrador"],
@@ -286,7 +295,7 @@ def build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, base_fun
         shards.setdefault(sh, {})[fid] = clean(f)
         r12 = ret.get("12m", {}).get("f")
         index.append([fid, nome, format_cnpj(c), (info["gestor"] or "")[:60], info["classe"] or "", info["anbima"] or "",
-                      rnd(pla[i_base], 6), rnd(r12, 6) if r12 is not None else None, sh])
+                      rnd(pla[i_base], 6), rnd(r12, 6) if r12 is not None else None, sh, 1 if is_prev(info) else 0])
 
     # Remove lotes antigos arquivo a arquivo (pastas sincronizadas, ex. OneDrive, podem travar rmtree).
     for old in out_dir.rglob("*.js"):
@@ -295,7 +304,8 @@ def build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, base_fun
     for sh, funds in shards.items():
         (out_dir / "s" / f"{sh:03d}.js").write_text(
             f"window.__MKT_SHARD({sh},{json.dumps(funds, ensure_ascii=False, separators=(',', ':'))});\n", encoding="utf-8")
-    meta = {"data_base": db_iso, "n": len(index), "recorte": cfg["descricao"], "campos": ["id", "nome", "cnpj", "gestor", "classe", "anbima", "pl", "r12", "lote"]}
+    meta = {"data_base": db_iso, "n": len(index), "recorte": cfg["descricao"], "campos": ["id", "nome", "cnpj", "gestor", "classe", "anbima", "pl", "r12", "lote", "prev"],
+            "n_prev": sum(1 for r in index if r[9])}
     (out_dir / "indice.js").write_text(
         f"window.__MKT_INDEX({json.dumps({'meta': meta, 'fundos': index}, ensure_ascii=False, separators=(',', ':'))});\n", encoding="utf-8")
     total = sum(p.stat().st_size for p in out_dir.rglob("*.js"))

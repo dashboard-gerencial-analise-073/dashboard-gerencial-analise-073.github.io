@@ -82,6 +82,7 @@ Information ratio = (Retorno a.a. fundo − Retorno a.a. índice) / Tracking err
           <ul>
             <li>Além da planilha-base, a busca da Comparação inclui ${m.mercado ? `<b>${fmt.int(m.mercado.n)} fundos de mercado</b> (${esc(m.mercado.recorte)})` : "fundos de mercado (base não gerada nesta versão)"}. As páginas Visão geral, Fundos e Análise continuam restritas à planilha-base.</li>
             <li>Mesma metodologia: cotas oficiais do Informe Diário da CVM, mesmo calendário, CDI e Ibovespa, mesmas janelas e indicadores. Classes reportadas só por subclasse usam a subclasse com mais cotistas.</li>
+            <li>Previdência (FIEs que recebem PGBL/VGBL): o cotista é a seguradora, por isso não se exige número mínimo de cotistas nem a condição de não exclusivo — o recorte é só por PL. Identificação pela classificação ANBIMA (“Previdência…”) ou pelo nome (PREV, PGBL, VGBL, FIE). Pode incluir fundos de planos específicos de empresas. A rentabilidade é a da cota, antes das taxas do plano cobradas pela seguradora.</li>
             <li>Benchmark inferido do indicador de desempenho informado à CVM (DI/Selic → CDI; Ibovespa → Ibovespa); outros índices aparecem como N/D.</li>
             <li>Sem dados comerciais da gestora (taxas, prazos de cotização/liquidação, objetivo, estratégia): N/D. Variação diária atípica de cota (eventos, troca de classe) interrompe a série a partir dela.</li>
           </ul>

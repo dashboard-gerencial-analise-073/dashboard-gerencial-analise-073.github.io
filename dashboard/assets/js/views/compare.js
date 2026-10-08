@@ -7,6 +7,8 @@
   App.views = App.views || {};
   let period = App.store.get("cmpPeriod", "common");
   let rootRef = null;
+  let onlyPrev = App.store.get("cmpOnlyPrev", false);
+  const PREV_BADGE = '<span class="badge prev" title="Fundo de previdência (PGBL/VGBL)">PREV</span>';
   App.on("selection", () => { if (rootRef && document.body.contains(rootRef) && (location.hash.split("/")[1] || "") === "comparacao") render(rootRef); });
 
   const MKT_BADGE = '<span class="badge mkt" title="Fundo de mercado (fora da planilha-base): dados da CVM, sem informações comerciais">MERCADO</span>';
@@ -29,12 +31,13 @@
       <div class="card"><div class="card-b">
         <div class="toolbar">
           <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação" ${sel.length >= App.MAX_COMPARE ? "disabled" : ""}><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
-          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px"><span class="legend-dot" style="background:${App.colorOf(f.id)};margin:0"></span>${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
+          <label class="f-check small" title="Mostrar apenas fundos de previdência (PGBL/VGBL) na busca"><input type="checkbox" id="only-prev" ${onlyPrev ? "checked" : ""}> Só previdência</label>
+          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px"><span class="legend-dot" style="background:${App.colorOf(f.id)};margin:0"></span>${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
           ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button>' : ""}
         </div>
       </div></div>
       ${missing.length ? `<div class="warn-note" style="margin-top:12px">Não foi possível carregar ${missing.length} fundo(s) de mercado (${missing.map((id) => esc(App.fundName(id))).join(", ")}): ${esc(App.mkt.error || "base de mercado indisponível")}. A base de mercado está disponível no site e no painel local (dashboard/index.html), não no relatório em arquivo único. <a href="#" data-drop-missing>Remover da seleção</a></div>` : ""}
-      ${sel.some((f) => f.mercado) ? `<div class="small muted" style="margin-top:10px">${MKT_BADGE} Fundos de mercado: mesma metodologia (cotas da CVM, CDI, Ibovespa), mas sem dados comerciais da gestora — taxas, liquidez, objetivo e estratégia aparecem como N/D. Benchmark inferido do indicador de desempenho informado à CVM.</div>` : ""}
+      ${sel.some((f) => f.mercado) ? `<div class="small muted" style="margin-top:10px">${MKT_BADGE} Fundos de mercado: mesma metodologia (cotas da CVM, CDI, Ibovespa), mas sem dados comerciais da gestora — taxas, liquidez, objetivo e estratégia aparecem como N/D. Benchmark inferido do indicador de desempenho informado à CVM.${sel.some((f) => f.mercado && f.previdencia) ? " Fundos de previdência (FIE): a rentabilidade é a da cota do fundo, antes das taxas do plano (carregamento) cobradas pela seguradora; a base pode incluir fundos de planos específicos de empresas." : ""}</div>` : ""}
       <div id="cmp-body"></div>`;
     const dm = root.querySelector("[data-drop-missing]");
     if (dm) dm.addEventListener("click", (e) => { e.preventDefault(); missing.forEach((id) => App.toggleSelect(id, false)); });
@@ -57,25 +60,27 @@
     const inp = root.querySelector("#ac-in"), list = root.querySelector("#ac-list");
     const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     let hl = 0, items = [];
+    const prevChk = root.querySelector("#only-prev");
+    prevChk.addEventListener("change", () => { onlyPrev = prevChk.checked; App.store.set("cmpOnlyPrev", onlyPrev); hl = 0; show(); inp.focus(); });
     const baseCnpjs = new Set(App.funds.map((f) => f.cnpj));
     const show = () => {
       const q = norm(inp.value.trim()), qd = inp.value.replace(/\D/g, "");
       const hit = (txt, cnpj) => !q || norm(txt).includes(q) || (qd.length >= 4 && cnpj.replace(/\D/g, "").includes(qd));
-      const base = App.funds.filter((f) => !App.state.selection.includes(f.id) && hit(f.nome + " " + f.familia + " " + f.categoria, f.cnpj))
-        .slice(0, q ? 6 : 12).map((f) => ({ id: f.id, nome: f.nome, sub: `${f.categoria} · ${f.cnpj}`, grupo: "Prateleira" }));
+      const base = App.funds.filter((f) => !App.state.selection.includes(f.id) && !onlyPrev && hit(f.nome + " " + f.familia + " " + f.categoria, f.cnpj))
+        .slice(0, q ? 6 : 12).map((f) => ({ id: f.id, nome: f.nome, sub: `${f.categoria} · ${f.cnpj}${f.previdencia ? " · versão previdência disponível" : ""}`, grupo: "Prateleira" }));
       let mk = [], status = "";
       if (App.mkt.index && q.length >= 2) {
-        mk = App.mkt.index.fundos.filter((r) => !App.state.selection.includes(r[0]) && !baseCnpjs.has(r[2]) && hit(r[1] + " " + r[3], r[2]))
+        mk = App.mkt.index.fundos.filter((r) => !App.state.selection.includes(r[0]) && !baseCnpjs.has(r[2]) && (!onlyPrev || r[9]) && hit(r[1] + " " + r[3], r[2]))
           .sort((x, y) => (y[6] || 0) - (x[6] || 0)).slice(0, 12 - base.length)
-          .map((r) => ({ id: r[0], nome: r[1], sub: `${r[4] || "—"} · ${r[3] || "gestor N/D"} · ${r[2]} · PL ${fmt.money(r[6]) || "N/D"}`, grupo: "Mercado" }));
+          .map((r) => ({ id: r[0], nome: r[1], sub: `${r[4] || "—"} · ${r[3] || "gestor N/D"} · ${r[2]} · PL ${fmt.money(r[6]) || "N/D"}`, grupo: "Mercado", prev: !!r[9] }));
       } else if (App.mkt.failed) status = "Busca no mercado indisponível nesta versão (use o site ou dashboard/index.html).";
       else if (!App.mkt.index) status = "Carregando base de mercado…";
-      else if (q.length < 2) status = `Digite ao menos 2 letras para buscar entre ${fmt.int(App.mkt.index.meta.n)} fundos de mercado.`;
+      else if (q.length < 2) status = `Digite ao menos 2 letras para buscar entre ${fmt.int(App.mkt.index.meta.n)} fundos de mercado (${fmt.int(App.mkt.index.meta.n_prev || 0)} de previdência).`;
       items = base.concat(mk);
       let h = "", grp = null;
       items.forEach((it, i) => {
         if (it.grupo !== grp) { grp = it.grupo; h += `<div class="ac-group">${grp === "Mercado" ? "Mercado (CVM)" : "Sua prateleira"}</div>`; }
-        h += `<button type="button" role="option" data-id="${esc(it.id)}" class="${i === hl ? "hl" : ""}">${esc(it.nome)}${it.grupo === "Mercado" ? " " + MKT_BADGE : ""}<small>${esc(it.sub)}</small></button>`;
+        h += `<button type="button" role="option" data-id="${esc(it.id)}" class="${i === hl ? "hl" : ""}">${esc(it.nome)}${it.grupo === "Mercado" ? " " + MKT_BADGE : ""}${it.prev ? " " + PREV_BADGE : ""}<small>${esc(it.sub)}</small></button>`;
       });
       if (status) h += `<div class="small muted" style="padding:8px 12px">${esc(status)}</div>`;
       list.innerHTML = h || '<div class="small muted" style="padding:10px 12px">Nenhum fundo encontrado</div>';

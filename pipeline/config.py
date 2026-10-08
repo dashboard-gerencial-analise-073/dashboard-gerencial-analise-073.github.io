@@ -69,9 +69,10 @@ CDA_TOP_N = 40
 MERCADO = {
     "ativo": True,
     "pl_min": 10e6,          # PL mínimo (R$)
-    "cotistas_min": 100,     # número mínimo de cotistas
-    "shards": 128,           # nº de arquivos-lote (carregados sob demanda)
-    "descricao": "classes abertas, não exclusivas, em funcionamento normal, PL ≥ R$ 10 mi e ≥ 100 cotistas na data-base",
+    "cotistas_min": 100,     # número mínimo de cotistas (não se aplica à previdência)
+    "incluir_previdencia": True,  # FIEs de PGBL/VGBL: cotista é a seguradora -> recorte só por PL
+    "shards": 384,           # nº de arquivos-lote (carregados sob demanda)
+    "descricao": "classes abertas, em funcionamento normal, PL ≥ R$ 10 mi na data-base; não exclusivas e com ≥ 100 cotistas, exceto fundos de previdência (cujo cotista é a seguradora)",
 }
 
 # Meses de histórico além da maior janela (margem para datas de início).
