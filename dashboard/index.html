@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relatório de Fundos</title>
+  <meta name="description" content="Relatório interativo de fundos de investimento: rentabilidade, risco, liquidez e comparação.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1 id="app-title">Fundos de Investimento</h1>
+          <p id="app-subtitle">Relatório de análise e comparação</p>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span class="pill"><span class="dot"></span>Data-base <b id="pill-db">—</b></span>
+        <span class="pill" id="pill-gestoras"></span>
+        <button class="icon-btn no-print" id="btn-print" type="button" title="Imprimir ou salvar em PDF">Imprimir / PDF</button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Seções">
+      <a class="tab" href="#/visao-geral" data-route="visao-geral">Visão geral</a>
+      <a class="tab" href="#/fundos" data-route="fundos">Fundos</a>
+      <a class="tab" href="#/comparacao" data-route="comparacao">Comparação <span class="count hidden" id="cmp-count">0</span></a>
+      <a class="tab" href="#/analise" data-route="analise">Análise</a>
+      <a class="tab" href="#/metodologia" data-route="metodologia">Metodologia e fontes</a>
+    </nav>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer id="footer"></footer>
+  <div class="tray hidden" id="tray" role="region" aria-label="Fundos selecionados para comparação"></div>
+
+  <script src="assets/vendor/echarts.min.js"></script>
+  <script src="data/dataset.js"></script>
+  <script src="data/site.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/views/overview.js"></script>
+  <script src="assets/js/views/funds.js"></script>
+  <script src="assets/js/views/detail.js"></script>
+  <script src="assets/js/views/portfolio.js"></script>
+  <script src="assets/js/views/compare.js"></script>
+  <script src="assets/js/views/analysis.js"></script>
+  <script src="assets/js/views/methodology.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

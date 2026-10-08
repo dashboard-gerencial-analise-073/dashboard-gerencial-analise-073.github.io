@@ -1,0 +1,13 @@
+# Dados baixados e cache (o GitHub Actions guarda em cache próprio)
+data/raw/
+data/cache/
+# Arquivos gerados pelo pipeline
+output/
+dashboard/data/dataset.js
+dashboard/data/site.js
+site/
+build.log
+__pycache__/
+*.tmp
+# Arquivos temporários do Excel
+~$*
