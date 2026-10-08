@@ -52,7 +52,7 @@
           if (!ps.length) return "";
           const d = App.fmt.date(ps[0].data[0]);
           const rows = ps.filter((p) => p.data[1] != null).sort((a, b) => b.data[1] - a.data[1])
-            .map((p) => `<div class="row"><span>${dot(p.color, series[p.seriesIndex].dashed)}${App.esc(p.seriesName)}</span><b>${fmtY(p.data[1])}</b></div>`).join("");
+            .map((p) => `<div class="row"><span>${dot(p.color, series[p.seriesIndex].dashed || (series[p.seriesIndex].lineType || "solid") !== "solid")}${App.esc(p.seriesName)}</span><b>${fmtY(p.data[1])}</b></div>`).join("");
           return `<div class="tt"><div class="tt-h">${d}</div>${rows}</div>`;
         },
       }),
@@ -62,7 +62,7 @@
       dataZoom: o.zoom ? [{ type: "inside" }, { type: "slider", height: 18, bottom: 8, borderColor: "transparent", backgroundColor: "#f4f5f2", fillerColor: "rgba(14,42,51,.08)", handleSize: 14, showDetail: false, dataBackground: { lineStyle: { color: AXIS }, areaStyle: { color: "#eef0ec" } } }] : undefined,
       series: series.map((s) => ({
         name: s.name, type: "line", showSymbol: false, symbolSize: 8, connectNulls: false, data: s.data,
-        lineStyle: { width: s.dashed ? 1.5 : 2, type: s.dashed ? "dashed" : "solid", color: s.color },
+        lineStyle: { width: s.dashed ? 1.5 : 2, type: s.dashed ? "dashed" : (s.lineType || "solid"), color: s.color },
         itemStyle: { color: s.color }, emphasis: { focus: "series", lineStyle: { width: 2.5 } },
         areaStyle: s.area ? { color: s.color, opacity: 0.12 } : undefined,
         z: s.dashed ? 1 : 2,
@@ -116,7 +116,7 @@
         emphasis: { scale: 1.4 },
         label: { show: !!o.labels && k !== "_muted", position: "right", fontSize: 11, color: TEXT2, formatter: (p) => p.data.p.label || "" },
         labelLayout: { hideOverlap: true },
-        data: byColor[k].map((p) => ({ value: [p.x, p.y], p })),
+        data: byColor[k].map((p) => ({ value: [p.x, p.y], p, symbol: p.symbol || "circle" })),
       })),
     });
   };

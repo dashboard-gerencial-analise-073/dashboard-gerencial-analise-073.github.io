@@ -26,13 +26,13 @@
     const missing = ids.filter((id) => !App.getFund(id));
     root.innerHTML = `
       <div class="page-head">
-        <div><h2>Comparação</h2><p>Selecione de 2 a ${App.MAX_COMPARE} fundos. Os gráficos usam o mesmo período e a mesma data-base para todos.</p></div>
+        <div><h2>Comparação</h2><p>Selecione 2 ou mais fundos (sem limite). Os gráficos usam o mesmo período e a mesma data-base para todos. Clique no nome de um fundo na legenda dos gráficos para escondê-lo ou mostrá-lo.</p></div>
       </div>
       <div class="card"><div class="card-b">
         <div class="toolbar">
-          <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação" ${sel.length >= App.MAX_COMPARE ? "disabled" : ""}><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
+          <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação"><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
           <label class="f-check small" title="Mostrar apenas fundos de previdência (PGBL/VGBL) na busca"><input type="checkbox" id="only-prev" ${onlyPrev ? "checked" : ""}> Só previdência</label>
-          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px"><span class="legend-dot" style="background:${App.colorOf(f.id)};margin:0"></span>${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
+          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px">${App.swatch(f.id)}${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
           ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button>' : ""}
         </div>
       </div></div>
@@ -101,7 +101,8 @@
 
   function renderBody(body, sel) {
     const last = App.axis.length - 1;
-    const series = sel.map((f) => ({ f, q: App.fullSeries(f), fi: App.firstIdx(App.fullSeries(f)), color: App.colorOf(f.id) }));
+    const series = sel.map((f) => ({ f, q: App.fullSeries(f), fi: App.firstIdx(App.fullSeries(f)), color: App.colorOf(f.id), st: App.styleOf(f.id) }));
+    const many = sel.length > App.SERIES_COLORS.length;
     const withData = series.filter((s) => s.fi != null);
     const commonStart = withData.length ? Math.max(...withData.map((s) => s.fi)) : last;
     const noData = series.filter((s) => s.fi == null).map((s) => s.f.nome);
@@ -139,7 +140,7 @@
       // Linhas
       const lines = series.filter((s) => s.fi != null).map((s) => {
         let st = Math.max(i0, s.fi); while (st < last && s.q[st] == null) st++;
-        return { name: s.f.nome, color: s.color, data: CH().growth(s.q, st, last), st };
+        return { name: s.f.nome, color: s.color, lineType: s.st.lineType, data: CH().growth(s.q, st, last), st };
       });
       benches.filter((b) => App.benchAvailable(b)).forEach((b) => {
         const bs = App.benchSeries(b); let st = i0; while (st < last && bs[st] == null) st++;
@@ -149,7 +150,7 @@
       const nd = benches.filter((b) => !App.benchAvailable(b)).map(App.benchName);
       body.querySelector("#growth-note").textContent = `Base 100 em ${fmt.date(App.axis[i0])}; valores líquidos de taxas, brutos de IR. Benchmarks tracejados.` + (nd.length ? ` Sem série pública: ${nd.join(", ")}.` : "");
       // Drawdown
-      CH().timeLines(body.querySelector("#ch-dd"), series.filter((s) => s.fi != null).map((s) => ({ name: s.f.nome, color: s.color, data: CH().drawdown(s.q, Math.max(i0, s.fi), last) })), { fmtY: (v) => CH().pct(v, 1), yMax: 0 });
+      CH().timeLines(body.querySelector("#ch-dd"), series.filter((s) => s.fi != null).map((s) => ({ name: s.f.nome, color: s.color, lineType: s.st.lineType, data: CH().drawdown(s.q, Math.max(i0, s.fi), last) })), { fmtY: (v) => CH().pct(v, 1), yMax: 0 });
       // Risco x retorno no período (mesmo cálculo do pipeline: composição e √252)
       const pts = [], miss = [];
       series.forEach((s) => {
@@ -159,7 +160,7 @@
         const m = dr.reduce((a, b) => a + b, 0) / dr.length;
         const sd = Math.sqrt(dr.reduce((a, b) => a + (b - m) ** 2, 0) / (dr.length - 1));
         const n = last - i0, r = s.q[last] / s.q[i0] - 1;
-        pts.push({ id: s.f.id, name: s.f.nome, x: sd * Math.sqrt(App.meta.dias_uteis_ano), y: n >= 240 ? Math.pow(1 + r, App.meta.dias_uteis_ano / n) - 1 : r, color: s.color, label: s.f.nome });
+        pts.push({ id: s.f.id, name: s.f.nome, x: sd * Math.sqrt(App.meta.dias_uteis_ano), y: n >= 240 ? Math.pow(1 + r, App.meta.dias_uteis_ano / n) - 1 : r, color: s.color, symbol: s.st.symbol, label: s.f.nome });
       });
       const n = last - i0;
       const rr = CH().scatter(body.querySelector("#ch-rr"), pts, { xLabel: "Volatilidade (a.a.)", yLabel: n >= 240 ? "Rentabilidade (a.a.)" : "Rentabilidade no período", labels: true });
@@ -168,20 +169,26 @@
       // Correlação
       const rets = series.map((s) => CH().dailyReturns(s.q, i0, last));
       const mat = rets.map((a, i) => rets.map((b, j) => (i === j ? 1 : CH().correlation(a, b))));
-      CH().corrMatrix(body.querySelector("#ch-corr"), sel.map((f) => f.nome), mat);
+      const corrEl = body.querySelector("#ch-corr");
+      corrEl.style.height = Math.max(320, 34 * sel.length + 120) + "px";
+      CH().corrMatrix(corrEl, sel.map((f) => f.nome), mat);
     };
     pEl.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; period = b.dataset.v; App.store.set("cmpPeriod", period); draw(); });
     draw();
 
     // Barras por janela (rentabilidade absoluta, acumulada)
     const wins = App.windows.filter((w) => w.id !== "m1");
-    CH().groupedBars(body.querySelector("#ch-win"), wins.map((w) => w.label), sel.map((f) => ({ name: f.nome, color: App.colorOf(f.id), data: wins.map((w) => (f.ret[w.id] || {}).f ?? null) })));
+    if (many) {
+      body.querySelector("#ch-win").outerHTML = `<div class="empty" style="padding:24px"><p>Com mais de ${App.SERIES_COLORS.length} fundos o gráfico de barras fica ilegível.</p><p class="small muted">Os retornos de todas as janelas estão no <b>Quadro comparativo</b> abaixo.</p></div>`;
+    } else {
+      CH().groupedBars(body.querySelector("#ch-win"), wins.map((w) => w.label), sel.map((f) => ({ name: f.nome, color: App.colorOf(f.id), data: wins.map((w) => (f.ret[w.id] || {}).f ?? null) })));
+    }
 
     // Rentabilidade mês a mês (últimos 12 meses)
     const mkeys = [...new Set(sel.flatMap((f) => Object.keys(f.mensal || {})))].sort().slice(-12).reverse();
     const benchCols = benches.filter((b) => App.benchAvailable(b));
     const benchMonthly = (b, k) => { const f = sel.find((x) => x.benchmark_id === b && x.mensal && x.mensal[k] && x.mensal[k][1] != null); return f ? f.mensal[k][1] : null; };
-    body.querySelector("#cmp-monthly").innerHTML = `<thead><tr><th class="l">Mês</th>${sel.map((f) => `<th><span class="legend-dot" style="background:${App.colorOf(f.id)}"></span>${esc(f.nome)}</th>`).join("")}${benchCols.map((b) => `<th style="color:var(--muted)">${esc(App.benchName(b))}</th>`).join("")}</tr></thead><tbody>` +
+    body.querySelector("#cmp-monthly").innerHTML = `<thead><tr><th class="l">Mês</th>${sel.map((f) => `<th>${App.swatch(f.id)}${esc(f.nome)}</th>`).join("")}${benchCols.map((b) => `<th style="color:var(--muted)">${esc(App.benchName(b))}</th>`).join("")}</tr></thead><tbody>` +
       mkeys.map((k) => `<tr style="cursor:default"><td class="l">${fmt.monthLabel(k)}${App.meta.data_base.slice(0, 7) === k ? "*" : ""}</td>${sel.map((f) => `<td>${f.mensal && f.mensal[k] ? App.cell(f.mensal[k][0], "pct", "") : '<span class="muted">—</span>'}</td>`).join("")}${benchCols.map((b) => { const v = benchMonthly(b, k); return `<td>${v == null ? '<span class="muted">—</span>' : App.cell(v, "pct", "", { color: false })}</td>`; }).join("")}</tr>`).join("") + "</tbody>";
 
     // Quadro comparativo
@@ -218,7 +225,7 @@
       ["Tributação", (f) => (f.mercado ? esc(App.tribText((f.cvm || {}).tributacao_lp) || "N/D") : f.isento_ir ? "Isento (PF)" : "Tributado")],
       ["Estratégia", (f) => `<span class="small" style="white-space:normal;display:block;max-width:260px;text-align:left;color:var(--text-2)">${esc(f.descricao || "N/D")}</span>`],
     ];
-    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l"><span class="legend-dot" style="background:${App.colorOf(f.id)}"></span>${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}</th>`).join("")}</tr></thead><tbody>` +
+    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l">${App.swatch(f.id)}${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}</th>`).join("")}</tr></thead><tbody>` +
       rows.map(([label, fn]) => (fn ? `<tr style="cursor:default"><td class="l">${label}</td>${sel.map((f) => `<td class="${label === "Estratégia" ? "l" : ""}">${fn(f)}</td>`).join("")}</tr>` : `<tr><td class="group-h" colspan="${sel.length + 1}">${label}</td></tr>`)).join("") + "</tbody>";
   }
 

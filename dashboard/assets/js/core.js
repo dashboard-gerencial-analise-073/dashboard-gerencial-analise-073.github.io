@@ -14,9 +14,13 @@
   App.axis = DS.eixo;
   App.windows = DS.meta.janelas;
   App.riskWindows = DS.meta.janelas_risco;
-  App.SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
+  // Paleta categórica validada (8 cores, ordem fixa). Do 9º fundo em diante as cores se repetem
+  // com outro tipo de linha/marcador (codificação secundária), nunca com novas cores geradas.
+  App.SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+  App.LINE_TYPES = ["solid", "dashed", "dotted"];
+  App.SYMBOLS = ["circle", "triangle", "diamond"];
   App.BENCH_COLOR = "#7d8f95";
-  App.MAX_COMPARE = App.SERIES_COLORS.length;
+  App.MAX_COMPARE = Infinity; // sem limite de fundos na comparação
 
   /* ---------------- Formatação ---------------- */
   const nf = (d) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -118,7 +122,6 @@
     const has = sel.includes(id);
     const want = force == null ? !has : force;
     if (want && !has) {
-      if (sel.length >= App.MAX_COMPARE) { App.toast(`A comparação aceita até ${App.MAX_COMPARE} fundos.`); return false; }
       sel.push(id);
     } else if (!want && has) sel.splice(sel.indexOf(id), 1);
     store.set("selection", sel);
@@ -126,7 +129,19 @@
     return true;
   };
   App.clearSelection = () => { App.state.selection.length = 0; store.set("selection", []); App.emit("selection"); };
-  App.colorOf = (id) => App.SERIES_COLORS[App.state.selection.indexOf(id)] || App.SERIES_COLORS[0];
+  App.styleOf = (id) => {
+    const i = Math.max(0, App.state.selection.indexOf(id)), n = App.SERIES_COLORS.length;
+    const cycle = Math.floor(i / n) % App.LINE_TYPES.length;
+    return { color: App.SERIES_COLORS[i % n], lineType: App.LINE_TYPES[cycle], symbol: App.SYMBOLS[cycle], cycle };
+  };
+  App.colorOf = (id) => App.styleOf(id).color;
+  /* Amostra de cor + tipo de linha (para legendas em HTML). */
+  App.swatch = (id) => {
+    const st = App.styleOf(id);
+    return st.cycle === 0
+      ? `<span class="legend-dot" style="background:${st.color}"></span>`
+      : `<span class="legend-line" style="border-top:3px ${st.lineType} ${st.color}" title="Linha ${st.lineType === "dashed" ? "tracejada" : "pontilhada"}"></span>`;
+  };
 
   /* ---------------- Fundos de mercado (só na Comparação, carregados sob demanda) ----------------
      data/mercado/indice.js  -> window.__MKT_INDEX({meta, fundos: [[id, nome, cnpj, gestor, classe, anbima, pl, r12, lote], ...]})

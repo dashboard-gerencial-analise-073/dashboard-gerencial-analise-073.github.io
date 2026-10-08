@@ -324,3 +324,6 @@ footer b { color: var(--text-2); font-weight: 600; }
 .badge.mkt { background: #ece8f7; color: #4a3aa7; }
 .ac-group { padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: 1px solid var(--line); }
 .ac-group:first-child { border-top: 0; }
+
+.legend-line { display: inline-block; width: 16px; height: 0; margin-right: 6px; vertical-align: 3px; }
+.tray .it .legend-dot, .tray .it .legend-line { margin-right: 0; }
