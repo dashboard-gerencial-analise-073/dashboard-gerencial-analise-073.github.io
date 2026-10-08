@@ -19,6 +19,7 @@ import carteira  # noqa: E402
 import config  # noqa: E402
 import cvm  # noqa: E402
 import export_xlsx  # noqa: E402
+import mercado  # noqa: E402
 import metrics as mt  # noqa: E402
 import quality  # noqa: E402
 from util import add_months, format_cnpj, iso, last_business_day_on_or_before, log, only_digits  # noqa: E402
@@ -297,6 +298,9 @@ def main():
             "qc": [{"nivel": i["nivel"], "codigo": i["codigo"], "mensagem": i["mensagem"]} for i in issues],
         })
 
+    log("   Fundos de mercado (página Comparação)…")
+    mkt_meta = mercado.build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, fundos, rnd, clean)
+
     log("5/6 Montando dataset…")
     cats = [c for c in config.CATEGORY_ORDER if any(f["categoria"] == c for f in out_funds)]
     cats += sorted({f["categoria"] for f in out_funds} - set(cats))
@@ -311,6 +315,7 @@ def main():
             "janelas": config.RETURN_WINDOWS, "janelas_risco": config.RISK_WINDOWS,
             "dias_uteis_ano": config.BUSINESS_DAYS_YEAR, "fontes": config.SOURCES,
             "categorias": cats,
+            "mercado": mkt_meta,
         },
         "gestoras": [{k: g.get(k) for k in ("gestora_id", "nome", "cnpj_gestor", "site")} for g in gestoras],
         "benchmarks": bench_meta,
@@ -324,6 +329,9 @@ def main():
     payload = json.dumps(dataset, ensure_ascii=False, separators=(",", ":"))
     config.DATASET_JS.write_text("/* Gerado por pipeline/build.py — não editar manualmente. */\nwindow.FUNDS_DATASET=" + payload + ";\n", encoding="utf-8")
     log(f"  {config.DATASET_JS} ({len(payload) / 1e6:.2f} MB)")
+    # Configuração do site: versão local sem downloads (o GitHub Actions sobrescreve na publicação).
+    site_js = "window.SITE_CONFIG = window.SITE_CONFIG || {downloads: false};\n"
+    (config.DATASET_JS.parent / "site.js").write_text(site_js, encoding="utf-8")
 
     log("6/6 Exportando planilha consolidada e relatório em arquivo único…")
     config.OUTPUT_DIR.mkdir(exist_ok=True)

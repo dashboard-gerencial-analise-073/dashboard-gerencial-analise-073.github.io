@@ -107,7 +107,7 @@
     retMode: store.get("retMode", "abs"),     // abs | excess | pctb
     retBase: store.get("retBase", "cum"),     // cum | ann
     riskWin: store.get("riskWin", "12m"),
-    selection: store.get("selection", []).filter((id) => App.byId[id]),
+    selection: store.get("selection", []).filter((id) => App.byId[id] || String(id).startsWith("m:")),
   };
   const listeners = {};
   App.on = (ev, fn) => { (listeners[ev] = listeners[ev] || []).push(fn); };
@@ -127,6 +127,36 @@
   };
   App.clearSelection = () => { App.state.selection.length = 0; store.set("selection", []); App.emit("selection"); };
   App.colorOf = (id) => App.SERIES_COLORS[App.state.selection.indexOf(id)] || App.SERIES_COLORS[0];
+
+  /* ---------------- Fundos de mercado (só na Comparação, carregados sob demanda) ----------------
+     data/mercado/indice.js  -> window.__MKT_INDEX({meta, fundos: [[id, nome, cnpj, gestor, classe, anbima, pl, r12, lote], ...]})
+     data/mercado/s/NNN.js   -> window.__MKT_SHARD(NNN, {id: fundo, ...})
+     Carregados por <script> (funciona também abrindo o HTML direto do disco). */
+  const MKT_DIR = "data/mercado/";
+  const mkt = (App.mkt = { index: null, byId: {}, funds: {}, shards: {}, indexPromise: null, failed: false });
+  const loadScript = (src) => new Promise((ok, fail) => {
+    const el = document.createElement("script");
+    el.src = src; el.onload = ok; el.onerror = () => fail(new Error("Não foi possível carregar " + src));
+    document.head.appendChild(el);
+  });
+  window.__MKT_INDEX = (d) => { mkt.index = d; };
+  window.__MKT_SHARD = (n, funds) => { mkt.shards[n] = true; Object.assign(mkt.funds, funds); };
+  mkt.loadIndex = () => mkt.indexPromise || (mkt.indexPromise = loadScript(MKT_DIR + "indice.js").then(() => {
+    if (!mkt.index) throw new Error("Índice de mercado vazio");
+    if (mkt.index.meta.data_base !== App.meta.data_base) throw new Error("Base de mercado com data-base diferente do relatório — gere novamente");
+    mkt.byId = Object.fromEntries(mkt.index.fundos.map((r) => [r[0], r]));
+    return mkt.index;
+  }).catch((e) => { mkt.failed = true; mkt.error = e.message; throw e; }));
+  mkt.ensure = async (ids) => {
+    const need = ids.filter((id) => String(id).startsWith("m:") && !mkt.funds[id]);
+    if (!need.length) return;
+    await mkt.loadIndex();
+    const lotes = [...new Set(need.map((id) => (mkt.byId[id] || [])[8]).filter((x) => x != null))];
+    await Promise.all(lotes.filter((n) => !mkt.shards[n]).map((n) => loadScript(`${MKT_DIR}s/${String(n).padStart(3, "0")}.js`)));
+  };
+  App.getFund = (id) => App.byId[id] || mkt.funds[id] || null;
+  App.rememberName = (id, nome) => { const m = store.get("mktNames", {}); m[id] = nome; store.set("mktNames", m); };
+  App.fundName = (id) => (App.getFund(id) || {}).nome || store.get("mktNames", {})[id] || String(id).replace(/^m:/, "CNPJ ");
 
   App.toast = function (msg) {
     let t = document.getElementById("toast");
@@ -218,6 +248,8 @@
     const p = (n) => (n == null ? "N/D" : n === 0 ? "D0" : "D+" + n);
     return `${p(f.cot_apl)} / ${p(f.cot_resg)} / ${p(f.liq_resg)}`;
   };
+  /* Campo "Tributacao_Longo_Prazo" do cadastro CVM: S / N / N/A */
+  App.tribText = (v) => ({ S: "Longo prazo", N: "Não é longo prazo", "N/A": "Não se aplica" }[v] || (v ? v : null));
   App.badges = (f) =>
     (f.qualificado ? '<span class="badge iq" title="Destinado a investidores qualificados">IQ</span> ' : "") +
     (f.previdencia ? '<span class="badge prev" title="Estratégia disponível em versão previdenciária">PREV</span> ' : "") +

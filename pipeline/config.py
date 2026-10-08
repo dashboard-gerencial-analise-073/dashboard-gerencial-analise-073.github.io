@@ -65,6 +65,15 @@ CDA_LOOKBACK_MONTHS = 6
 # Posições exibidas por fundo no dashboard (a lista completa vai para a planilha consolidada).
 CDA_TOP_N = 40
 
+# Fundos de mercado (apenas na página Comparação). Recorte na data-base.
+MERCADO = {
+    "ativo": True,
+    "pl_min": 10e6,          # PL mínimo (R$)
+    "cotistas_min": 100,     # número mínimo de cotistas
+    "shards": 128,           # nº de arquivos-lote (carregados sob demanda)
+    "descricao": "classes abertas, não exclusivas, em funcionamento normal, PL ≥ R$ 10 mi e ≥ 100 cotistas na data-base",
+}
+
 # Meses de histórico além da maior janela (margem para datas de início).
 HISTORY_MARGIN_MONTHS = 2
 

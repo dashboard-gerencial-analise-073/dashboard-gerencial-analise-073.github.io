@@ -106,7 +106,7 @@
       ["Taxa de administração", f.taxa_adm == null ? App.ND() : `${fmt.num(f.taxa_adm, 2)}% a.a.`], ["Taxa de performance", perf],
       ["Aplicação / resgate / crédito", `<span class="num">${App.liquidityText(f)}</span> <span class="muted small">(${esc(f.prazo_tipo || "")})</span>`],
       ["Público-alvo", f.qualificado ? "Investidores qualificados" : "Investidores em geral"],
-      ["Tributação", f.isento_ir ? "Isento de IR para pessoa física" : esc((f.cvm || {}).tributacao_lp ? "Longo prazo: " + f.cvm.tributacao_lp : "Conforme regulamento")],
+      ["Tributação", f.isento_ir ? "Isento de IR para pessoa física" : esc(App.tribText((f.cvm || {}).tributacao_lp) || "Conforme regulamento")],
       ["Versão previdência", f.previdencia ? "Disponível" : "Não informada"],
       ["Início do fundo", App.cell(f.inicio, "date", "Não localizado na CVM")],
       ["Primeira cota na base", App.cell(f.primeira_cota, "date", "Sem cotas no período coletado")],

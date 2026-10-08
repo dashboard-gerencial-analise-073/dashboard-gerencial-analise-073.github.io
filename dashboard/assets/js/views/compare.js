@@ -9,8 +9,19 @@
   let rootRef = null;
   App.on("selection", () => { if (rootRef && document.body.contains(rootRef) && (location.hash.split("/")[1] || "") === "comparacao") render(rootRef); });
 
+  const MKT_BADGE = '<span class="badge mkt" title="Fundo de mercado (fora da planilha-base): dados da CVM, sem informações comerciais">MERCADO</span>';
+
   function render(root) {
-    const sel = App.state.selection.map((id) => App.byId[id]).filter(Boolean);
+    const ids = App.state.selection.slice();
+    const pending = ids.filter((id) => !App.getFund(id));
+    if (pending.length && !App.mkt.failed) {
+      root.innerHTML = `<div class="card empty"><h3>Carregando fundos de mercado…</h3><p class="muted small">Buscando as séries na base da CVM.</p></div>`;
+      rootRef = root;
+      App.mkt.ensure(pending).then(() => render(root)).catch(() => render(root));
+      return;
+    }
+    const sel = ids.map((id) => App.getFund(id)).filter(Boolean);
+    const missing = ids.filter((id) => !App.getFund(id));
     root.innerHTML = `
       <div class="page-head">
         <div><h2>Comparação</h2><p>Selecione de 2 a ${App.MAX_COMPARE} fundos. Os gráficos usam o mesmo período e a mesma data-base para todos.</p></div>
@@ -18,11 +29,15 @@
       <div class="card"><div class="card-b">
         <div class="toolbar">
           <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação" ${sel.length >= App.MAX_COMPARE ? "disabled" : ""}><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
-          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px"><span class="legend-dot" style="background:${App.colorOf(f.id)};margin:0"></span><a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a><button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
+          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px"><span class="legend-dot" style="background:${App.colorOf(f.id)};margin:0"></span>${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
           ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button>' : ""}
         </div>
       </div></div>
+      ${missing.length ? `<div class="warn-note" style="margin-top:12px">Não foi possível carregar ${missing.length} fundo(s) de mercado (${missing.map((id) => esc(App.fundName(id))).join(", ")}): ${esc(App.mkt.error || "base de mercado indisponível")}. A base de mercado está disponível no site e no painel local (dashboard/index.html), não no relatório em arquivo único. <a href="#" data-drop-missing>Remover da seleção</a></div>` : ""}
+      ${sel.some((f) => f.mercado) ? `<div class="small muted" style="margin-top:10px">${MKT_BADGE} Fundos de mercado: mesma metodologia (cotas da CVM, CDI, Ibovespa), mas sem dados comerciais da gestora — taxas, liquidez, objetivo e estratégia aparecem como N/D. Benchmark inferido do indicador de desempenho informado à CVM.</div>` : ""}
       <div id="cmp-body"></div>`;
+    const dm = root.querySelector("[data-drop-missing]");
+    if (dm) dm.addEventListener("click", (e) => { e.preventDefault(); missing.forEach((id) => App.toggleSelect(id, false)); });
     bindAc(root);
     root.querySelector("#sel-chips").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) App.toggleSelect(b.dataset.rm, false); });
     const bc = root.querySelector("#btn-clear"); if (bc) bc.addEventListener("click", () => App.clearSelection());
@@ -42,21 +57,40 @@
     const inp = root.querySelector("#ac-in"), list = root.querySelector("#ac-list");
     const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     let hl = 0, items = [];
+    const baseCnpjs = new Set(App.funds.map((f) => f.cnpj));
     const show = () => {
       const q = norm(inp.value.trim()), qd = inp.value.replace(/\D/g, "");
-      items = App.funds.filter((f) => !App.state.selection.includes(f.id) && (!q || norm(f.nome + " " + f.familia + " " + f.categoria).includes(q) || (qd.length >= 4 && f.cnpj.replace(/\D/g, "").includes(qd)))).slice(0, 12);
-      list.innerHTML = items.map((f, i) => `<button type="button" role="option" data-id="${f.id}" class="${i === hl ? "hl" : ""}">${esc(f.nome)}<small>${esc(f.categoria)} · ${esc(f.cnpj)}</small></button>`).join("") || '<div class="small muted" style="padding:10px 12px">Nenhum fundo encontrado</div>';
+      const hit = (txt, cnpj) => !q || norm(txt).includes(q) || (qd.length >= 4 && cnpj.replace(/\D/g, "").includes(qd));
+      const base = App.funds.filter((f) => !App.state.selection.includes(f.id) && hit(f.nome + " " + f.familia + " " + f.categoria, f.cnpj))
+        .slice(0, q ? 6 : 12).map((f) => ({ id: f.id, nome: f.nome, sub: `${f.categoria} · ${f.cnpj}`, grupo: "Prateleira" }));
+      let mk = [], status = "";
+      if (App.mkt.index && q.length >= 2) {
+        mk = App.mkt.index.fundos.filter((r) => !App.state.selection.includes(r[0]) && !baseCnpjs.has(r[2]) && hit(r[1] + " " + r[3], r[2]))
+          .sort((x, y) => (y[6] || 0) - (x[6] || 0)).slice(0, 12 - base.length)
+          .map((r) => ({ id: r[0], nome: r[1], sub: `${r[4] || "—"} · ${r[3] || "gestor N/D"} · ${r[2]} · PL ${fmt.money(r[6]) || "N/D"}`, grupo: "Mercado" }));
+      } else if (App.mkt.failed) status = "Busca no mercado indisponível nesta versão (use o site ou dashboard/index.html).";
+      else if (!App.mkt.index) status = "Carregando base de mercado…";
+      else if (q.length < 2) status = `Digite ao menos 2 letras para buscar entre ${fmt.int(App.mkt.index.meta.n)} fundos de mercado.`;
+      items = base.concat(mk);
+      let h = "", grp = null;
+      items.forEach((it, i) => {
+        if (it.grupo !== grp) { grp = it.grupo; h += `<div class="ac-group">${grp === "Mercado" ? "Mercado (CVM)" : "Sua prateleira"}</div>`; }
+        h += `<button type="button" role="option" data-id="${esc(it.id)}" class="${i === hl ? "hl" : ""}">${esc(it.nome)}${it.grupo === "Mercado" ? " " + MKT_BADGE : ""}<small>${esc(it.sub)}</small></button>`;
+      });
+      if (status) h += `<div class="small muted" style="padding:8px 12px">${esc(status)}</div>`;
+      list.innerHTML = h || '<div class="small muted" style="padding:10px 12px">Nenhum fundo encontrado</div>';
       list.classList.remove("hidden");
     };
-    inp.addEventListener("focus", show);
+    const pick = (it) => { if (!it) return; if (it.grupo === "Mercado") App.rememberName(it.id, it.nome); App.toggleSelect(it.id, true); };
+    inp.addEventListener("focus", () => { show(); if (!App.mkt.index && !App.mkt.failed) App.mkt.loadIndex().then(show, show); });
     inp.addEventListener("input", () => { hl = 0; show(); });
     inp.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown") { hl = Math.min(hl + 1, items.length - 1); show(); e.preventDefault(); }
       else if (e.key === "ArrowUp") { hl = Math.max(hl - 1, 0); show(); e.preventDefault(); }
-      else if (e.key === "Enter" && items[hl]) { App.toggleSelect(items[hl].id, true); }
+      else if (e.key === "Enter" && items[hl]) { pick(items[hl]); }
       else if (e.key === "Escape") list.classList.add("hidden");
     });
-    list.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-id]"); if (b) { e.preventDefault(); App.toggleSelect(b.dataset.id, true); } });
+    list.addEventListener("mousedown", (e) => { const b = e.target.closest("[data-id]"); if (b) { e.preventDefault(); pick(items.find((x) => x.id === b.dataset.id)); } });
     inp.addEventListener("blur", () => setTimeout(() => list.classList.add("hidden"), 120));
   }
 
@@ -66,7 +100,7 @@
     const withData = series.filter((s) => s.fi != null);
     const commonStart = withData.length ? Math.max(...withData.map((s) => s.fi)) : last;
     const noData = series.filter((s) => s.fi == null).map((s) => s.f.nome);
-    const benches = [...new Set(sel.map((f) => f.benchmark_id))];
+    const benches = [...new Set(sel.map((f) => f.benchmark_id).filter(Boolean))];
     const periods = [["common", "Máx. comum"], ["12", "12M"], ["24", "24M"], ["36", "36M"], ["48", "48M"]];
 
     body.innerHTML = `
@@ -124,7 +158,7 @@
       });
       const n = last - i0;
       const rr = CH().scatter(body.querySelector("#ch-rr"), pts, { xLabel: "Volatilidade (a.a.)", yLabel: n >= 240 ? "Rentabilidade (a.a.)" : "Rentabilidade no período", labels: true });
-      rr && rr.on("click", (p) => { location.hash = "#/fundo/" + p.data.p.id; });
+      rr && rr.on("click", (p) => { if (App.byId[p.data.p.id]) location.hash = "#/fundo/" + p.data.p.id; });
       body.querySelector("#rr-note").textContent = (n < 240 ? "Período inferior a 1 ano: rentabilidade não anualizada. " : "") + (miss.length ? `Fora do gráfico (histórico insuficiente no período): ${miss.join(", ")}.` : "");
       // Correlação
       const rets = series.map((s) => CH().dailyReturns(s.q, i0, last));
@@ -152,7 +186,7 @@
       ...App.windows.map((w) => [`${w.label}`, (f) => App.cell((f.ret[w.id] || {}).f, "pct", (f.ret[w.id] || {}).nd)]),
       ...App.windows.filter((w) => w.type === "months" && w.n >= 24).map((w) => [`${w.label} anualizada`, (f) => App.cell((f.ret[w.id] || {}).fa, "pct", (f.ret[w.id] || {}).nd)]),
       ["Benchmark", null],
-      ["Benchmark", (f) => esc(App.benchName(f.benchmark_id))],
+      ["Benchmark", (f) => (f.benchmark_id ? esc(App.benchName(f.benchmark_id)) + (f.mercado ? ' <span class="small muted">(indicador CVM)</span>' : "") : App.ND(`Indicador informado à CVM: ${f.indicador_cvm || "não informado"} — sem série pública`))],
       ["Benchmark 12M", (f) => App.cell((f.ret["12m"] || {}).b, "pct", (f.ret["12m"] || {}).nd_b, { color: false })],
       ["Excesso 12M", (f) => App.cell((f.ret["12m"] || {}).x, "pp", (f.ret["12m"] || {}).nd || (f.ret["12m"] || {}).nd_b)],
       ["Excesso 36M a.a.", (f) => App.cell((f.ret["36m"] || {}).xa, "pp", (f.ret["36m"] || {}).nd || (f.ret["36m"] || {}).nd_b)],
@@ -163,22 +197,23 @@
       ["Máximo drawdown", (f) => App.metricCell(f, "mdd:" + rw)],
       ["% meses positivos", (f) => App.metricCell(f, "mpos:" + rw)],
       ["% meses acima do bench.", (f) => App.metricCell(f, "macima:" + rw)],
-      ["Objetivo (gestora)", (f) => (f.alvo ? `<span class="small">${esc(f.alvo_tipo)}: ${esc(f.alvo)}</span>` : App.ND())],
+      ["Objetivo (gestora)", (f) => (f.alvo ? `<span class="small">${esc(f.alvo_tipo)}: ${esc(f.alvo)}</span>` : App.ND(f.mercado ? "Fundo de mercado: sem material da gestora" : undefined))],
       ["Fundo", null],
-      ["Categoria", (f) => esc(f.categoria)],
+      ["Categoria", (f) => esc(f.categoria) + (f.mercado && f.cvm.classificacao_anbima ? `<div class="small muted">${esc(f.cvm.classificacao_anbima)}</div>` : "")],
+      ["Gestor", (f) => `<span class="small">${esc((f.cvm || {}).gestor || "N/D")}</span>`],
       ["PL", (f) => App.metricCell(f, "pl")],
       ["Captação líquida 12M", (f) => App.metricCell(f, "capt12")],
       ["Cotistas", (f) => App.metricCell(f, "cotistas")],
       ["Início", (f) => App.metricCell(f, "inicio")],
       ["Liquidez e custos", null],
-      ["Aplic. / cotiz. / crédito", (f) => `<span class="num">${App.liquidityText(f)}</span>`],
-      ["Taxa de administração", (f) => (f.taxa_adm == null ? App.ND() : `<span class="num">${fmt.num(f.taxa_adm, 2)}% a.a.</span>`)],
-      ["Taxa de performance", (f) => (f.taxa_perf == null ? "Não há" : `<span class="num">${fmt.num(f.taxa_perf, 0)}%</span> <span class="small muted">s/ ${esc(f.taxa_perf_indice || "")}</span>`)],
-      ["Público", (f) => (f.qualificado ? "Qualificado" : "Geral")],
-      ["Tributação", (f) => (f.isento_ir ? "Isento (PF)" : "Tributado")],
+      ["Aplic. / cotiz. / crédito", (f) => (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : `<span class="num">${App.liquidityText(f)}</span>`)],
+      ["Taxa de administração", (f) => (f.taxa_adm == null ? (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : App.ND()) : `<span class="num">${fmt.num(f.taxa_adm, 2)}% a.a.</span>`)],
+      ["Taxa de performance", (f) => (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : f.taxa_perf == null ? "Não há" : `<span class="num">${fmt.num(f.taxa_perf, 0)}%</span> <span class="small muted">s/ ${esc(f.taxa_perf_indice || "")}</span>`)],
+      ["Público", (f) => (f.mercado ? esc((f.cvm || {}).publico_alvo || "N/D") : f.qualificado ? "Qualificado" : "Geral")],
+      ["Tributação", (f) => (f.mercado ? esc(App.tribText((f.cvm || {}).tributacao_lp) || "N/D") : f.isento_ir ? "Isento (PF)" : "Tributado")],
       ["Estratégia", (f) => `<span class="small" style="white-space:normal;display:block;max-width:260px;text-align:left;color:var(--text-2)">${esc(f.descricao || "N/D")}</span>`],
     ];
-    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l"><span class="legend-dot" style="background:${App.colorOf(f.id)}"></span>${esc(f.nome)}</th>`).join("")}</tr></thead><tbody>` +
+    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l"><span class="legend-dot" style="background:${App.colorOf(f.id)}"></span>${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}</th>`).join("")}</tr></thead><tbody>` +
       rows.map(([label, fn]) => (fn ? `<tr style="cursor:default"><td class="l">${label}</td>${sel.map((f) => `<td class="${label === "Estratégia" ? "l" : ""}">${fn(f)}</td>`).join("")}</tr>` : `<tr><td class="group-h" colspan="${sel.length + 1}">${label}</td></tr>`)).join("") + "</tbody>";
   }
 

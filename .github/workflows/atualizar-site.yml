@@ -1,5 +1,5 @@
 # Atualiza os dados e publica o relatório no GitHub Pages.
-# - Semanal (terça, 07:00 de Brasília) e sob demanda (aba Actions → "Atualizar e publicar relatório" → Run workflow).
+# - Semanal (terça, 07:00 de Brasília), a cada envio (push) de código/planilha e sob demanda (aba Actions → "Atualizar e publicar relatório" → Run workflow).
 # - Data-base = DATA_BASE_PADRAO de pipeline/config.py (fechamento do mês anterior).
 # - Se a CVM/BCB ainda não cobrirem a data-base, o site anterior é mantido (sem erro).
 name: Atualizar e publicar relatório
@@ -7,6 +7,10 @@ name: Atualizar e publicar relatório
 on:
   schedule:
     - cron: "0 10 * * 2"
+  # Publica também quando código, dashboard ou planilha-base forem enviados ao GitHub.
+  push:
+    branches: [main]
+    paths: ["pipeline/**", "dashboard/**", "data/input/**", "requirements.txt", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       data_base:

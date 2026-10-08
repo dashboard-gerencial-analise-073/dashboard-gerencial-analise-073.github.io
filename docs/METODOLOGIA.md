@@ -86,7 +86,18 @@ correlação é calculada sob demanda na página de comparação.
 - Posições idênticas (tipo, ativo, código, vencimento) vindas de fundos diferentes são somadas.
 - Dashboard: 40 maiores posições + composição por classe; planilha: carteira consolidada completa (aba Carteiras).
 
-## 8. Tratamento de dados
+## 8. Fundos de mercado (Comparação) — `pipeline/mercado.py`
+
+- Universo na data-base (`config.MERCADO`): classes do cadastro RCVM 175 em funcionamento normal, condomínio aberto,
+  não exclusivas, com PL ≥ R$ 10 mi e ≥ 100 cotistas no Informe Diário. Classes reportadas só por subclasse entram
+  pela soma das subclasses (PL/cotistas) e pela cota da subclasse com mais cotistas.
+- Fundos da planilha-base são excluídos do universo (já estão no dataset principal, com dados comerciais).
+- Métricas: as mesmas funções de `metrics.py`, no mesmo eixo de dias úteis. Benchmark pelo indicador de desempenho
+  da CVM (DI/Selic → CDI; Ibovespa → IBOV; demais → N/D).
+- Salto diário de cota acima de 2× o limite de retorno suspeito: a série passa a valer só a partir do salto.
+- Saída: `dashboard/data/mercado/indice.js` (busca) e `s/NNN.js` (lotes carregados sob demanda).
+
+## 9. Tratamento de dados
 
 - Nada é interpolado, estimado ou preenchido. Cota 0 reportada à CVM = ausente.
 - Subclasses (RCVM 175): série da classe; se a CVM passar a reportar só por subclasse, continua pela
@@ -95,7 +106,7 @@ correlação é calculada sob demanda na página de comparação.
 - Variação diária acima de 8% (15% para renda variável) é sinalizada para conferência (pode ser evento
   societário, amortização, erro de reporte) — não é removida automaticamente.
 
-## 9. Controle de qualidade (automático)
+## 10. Controle de qualidade (automático)
 
 Erros, alertas e informativos ficam na página *Metodologia e fontes* e na aba *Qualidade* da planilha:
 CNPJ inválido/duplicado, id duplicado, gestora/benchmark inexistente, fundo não localizado na CVM,

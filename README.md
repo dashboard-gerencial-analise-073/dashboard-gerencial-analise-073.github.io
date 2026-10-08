@@ -28,12 +28,19 @@ Clique no fundo na tabela (ou nos atalhos *Rentab. mensal* / *Carteira* abaixo d
 
 A página *Comparação* também traz a rentabilidade mês a mês dos fundos selecionados (últimos 12 meses).
 
+**Fundos de mercado na Comparação:** a busca da página *Comparação* encontra, além da prateleira, ~3 mil fundos
+de mercado (recorte em `pipeline/config.py → MERCADO`: abertos, não exclusivos, PL ≥ R$ 10 mi, ≥ 100 cotistas).
+Mesma metodologia, mas sem dados comerciais (taxas, liquidez, estratégia = N/D). As demais páginas continuam só
+com a planilha-base. A base de mercado (~40 MB em `dashboard/data/mercado/`) funciona no site e no
+`dashboard/index.html`; não é embutida no relatório em arquivo único. Para desligar: `MERCADO["ativo"] = False`.
+
 ## Versão online (GitHub Pages — sem custo)
 
 O repositório no GitHub atualiza e publica o site sozinho, pelo workflow
 `.github/workflows/atualizar-site.yml`:
 
-- **Quando:** toda terça-feira às 07:00 (Brasília) e sempre que você pedir (GitHub → aba **Actions** →
+- **Quando:** toda terça-feira às 07:00 (Brasília), automaticamente sempre que código ou a planilha-base forem
+  enviados ao GitHub, e sempre que você pedir (GitHub → aba **Actions** →
   *Atualizar e publicar relatório* → **Run workflow**; dá para informar outra data-base ali).
 - **O quê:** roda o mesmo `pipeline/build.py` (data-base = fechamento do mês anterior), publica o dashboard e
   disponibiliza no rodapé os downloads da planilha completa e do relatório em arquivo único.
@@ -41,7 +48,7 @@ O repositório no GitHub atualiza e publica o site sozinho, pelo workflow
   registra um aviso; na semana seguinte ele tenta de novo.
 - **Para mudar fundos/cadastro online:** edite `data/input/cadastro_fundos.xlsx` e envie ao GitHub
   (pelo site: abrir o arquivo no repositório → ícone de lápis/“Upload files”; ou `git commit` + `git push`).
-  Depois rode o workflow manualmente para publicar na hora.
+  A publicação começa sozinha ao enviar.
 - **Custos:** nenhum. Repositório público → GitHub Actions e Pages gratuitos e sem limite de minutos.
   Os dados brutos (~600 MB) ficam no cache do Actions, não no repositório.
 - **Atenção:** o repositório e o site são públicos (inclui a planilha-base).
@@ -143,6 +150,7 @@ Relatorio_Fundos/
 │   ├── cvm.py          # informe diário + cadastros CVM
 │   ├── benchmarks.py   # CDI (BCB), Ibovespa
 │   ├── carteira.py     # carteiras (CDA/CVM), look-through e conciliação
+│   ├── mercado.py      # universo de fundos de mercado (só para a Comparação)
 │   ├── metrics.py      # rentabilidade, risco, fluxos
 │   ├── quality.py      # controle de qualidade
 │   ├── export_xlsx.py  # planilha consolidada

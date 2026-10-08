@@ -33,7 +33,7 @@
     tray.classList.toggle("hidden", !sel.length || route === "comparacao");
     if (!sel.length) return;
     tray.innerHTML = `
-      <div class="items">${sel.map((id) => `<span class="it"><i style="background:${App.colorOf(id)}"></i>${App.esc(App.byId[id].nome)}<button type="button" data-rm="${id}" aria-label="Remover ${App.esc(App.byId[id].nome)}">×</button></span>`).join("")}</div>
+      <div class="items">${sel.map((id) => `<span class="it"><i style="background:${App.colorOf(id)}"></i>${App.esc(App.fundName(id))}<button type="button" data-rm="${id}" aria-label="Remover ${App.esc(App.fundName(id))}">×</button></span>`).join("")}</div>
       <button class="btn ghost" type="button" data-clear>Limpar</button>
       <a class="btn primary" href="#/comparacao">Comparar ${sel.length} ${sel.length === 1 ? "fundo" : "fundos"} →</a>`;
   }

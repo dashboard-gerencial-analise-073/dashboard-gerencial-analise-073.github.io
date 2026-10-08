@@ -73,6 +73,9 @@ def read_daily(months, cnpjs):
             log(f"  aviso: arquivo CVM ausente {z.name}")
             continue
         cache = config.CACHE_DIR / f"cvm_{ym}_{key}.json"
+        for old in config.CACHE_DIR.glob(f"cvm_{ym}_*.json"):  # extrações de outra lista de fundos
+            if old != cache:
+                old.unlink()
         if cache.exists() and cache.stat().st_mtime >= z.stat().st_mtime:
             part = json.loads(cache.read_text(encoding="utf-8"))
         else:

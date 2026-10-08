@@ -78,6 +78,14 @@ Information ratio = (Retorno a.a. fundo − Retorno a.a. índice) / Tracking err
             <li>Percentuais sobre o PL informado na própria CDA. A soma da carteira direta de cada fundo é conferida contra esse PL (tolerância de 2%).</li>
           </ul>
 
+          <h3>Fundos de mercado (página Comparação)</h3>
+          <ul>
+            <li>Além da planilha-base, a busca da Comparação inclui ${m.mercado ? `<b>${fmt.int(m.mercado.n)} fundos de mercado</b> (${esc(m.mercado.recorte)})` : "fundos de mercado (base não gerada nesta versão)"}. As páginas Visão geral, Fundos e Análise continuam restritas à planilha-base.</li>
+            <li>Mesma metodologia: cotas oficiais do Informe Diário da CVM, mesmo calendário, CDI e Ibovespa, mesmas janelas e indicadores. Classes reportadas só por subclasse usam a subclasse com mais cotistas.</li>
+            <li>Benchmark inferido do indicador de desempenho informado à CVM (DI/Selic → CDI; Ibovespa → Ibovespa); outros índices aparecem como N/D.</li>
+            <li>Sem dados comerciais da gestora (taxas, prazos de cotização/liquidação, objetivo, estratégia): N/D. Variação diária atípica de cota (eventos, troca de classe) interrompe a série a partir dela.</li>
+          </ul>
+
           <h3>Tratamento de dados</h3>
           <ul>
             <li><b>Calendário</b>: dias úteis definidos pelas datas da série do CDI (BCB), o que exclui feriados nacionais. Cotas em datas fora do calendário são ignoradas e registradas.</li>
