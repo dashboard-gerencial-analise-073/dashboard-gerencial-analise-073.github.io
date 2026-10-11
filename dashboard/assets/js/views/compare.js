@@ -1,4 +1,4 @@
-/* Página "Comparação": até 6 fundos lado a lado. */
+/* Página "Comparação": fundos da prateleira, de mercado (CVM) e listados na B3 lado a lado. */
 (function () {
   "use strict";
   const App = window.App;
@@ -12,14 +12,18 @@
   App.on("selection", () => { if (rootRef && document.body.contains(rootRef) && (location.hash.split("/")[1] || "") === "comparacao") render(rootRef); });
 
   const MKT_BADGE = '<span class="badge mkt" title="Fundo de mercado (fora da planilha-base): dados da CVM, sem informações comerciais">MERCADO</span>';
+  const LST_BADGE = (tipo) => `<span class="badge lst" title="Fundo listado na B3: retorno total = preço de fechamento + proventos reinvestidos">${esc(tipo || "LISTADO")}</span>`;
+  const NA_LST = "Fundo listado: compra e venda em bolsa (mercado secundário); taxas e regras no regulamento do fundo";
 
+  const tried = new Set(); // ids já procurados nas bases externas (evita recarregar quem não existe mais)
   function render(root) {
     const ids = App.state.selection.slice();
     const pending = ids.filter((id) => !App.getFund(id));
-    if (pending.length && !App.mkt.failed) {
-      root.innerHTML = `<div class="card empty"><h3>Carregando fundos de mercado…</h3><p class="muted small">Buscando as séries na base da CVM.</p></div>`;
+    if (pending.length && pending.some((id) => !App.extFailed(id) && !tried.has(id))) {
+      root.innerHTML = `<div class="card empty"><h3>Carregando fundos…</h3><p class="muted small">Buscando as séries na base de mercado (CVM) e de fundos listados (B3).</p></div>`;
       rootRef = root;
-      App.mkt.ensure(pending).then(() => render(root)).catch(() => render(root));
+      pending.forEach((id) => tried.add(id));
+      App.ensureFunds(pending).then(() => render(root));
       return;
     }
     const sel = ids.map((id) => App.getFund(id)).filter(Boolean);
@@ -32,12 +36,13 @@
         <div class="toolbar">
           <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação"><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
           <label class="f-check small" title="Mostrar apenas fundos de previdência (PGBL/VGBL) na busca"><input type="checkbox" id="only-prev" ${onlyPrev ? "checked" : ""}> Só previdência</label>
-          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px">${App.swatch(f.id)}${f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
+          <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px">${App.swatch(f.id)}${f.listado ? `<span title="${esc(f.cvm.denominacao || "")}">${esc(f.nome)}</span> ${LST_BADGE(f.tipo)}` : f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
           ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button>' : ""}
         </div>
       </div></div>
-      ${missing.length ? `<div class="warn-note" style="margin-top:12px">Não foi possível carregar ${missing.length} fundo(s) de mercado (${missing.map((id) => esc(App.fundName(id))).join(", ")}): ${esc(App.mkt.error || "base de mercado indisponível")}. A base de mercado está disponível no site e no painel local (dashboard/index.html), não no relatório em arquivo único. <a href="#" data-drop-missing>Remover da seleção</a></div>` : ""}
+      ${missing.length ? `<div class="warn-note" style="margin-top:12px">Não foi possível carregar ${missing.length} fundo(s) (${missing.map((id) => esc(App.fundName(id))).join(", ")}): ${esc(App.extError(missing[0]) || "fundo fora da base nesta data-base")}. As bases de mercado e de fundos listados estão disponíveis no site e no painel local (dashboard/index.html), não no relatório em arquivo único. <a href="#" data-drop-missing>Remover da seleção</a></div>` : ""}
       ${sel.some((f) => f.mercado) ? `<div class="small muted" style="margin-top:10px">${MKT_BADGE} Fundos de mercado: mesma metodologia (cotas da CVM, CDI, Ibovespa), mas sem dados comerciais da gestora — taxas, liquidez, objetivo e estratégia aparecem como N/D. Benchmark inferido do indicador de desempenho informado à CVM.${sel.some((f) => f.mercado && f.previdencia) ? " Fundos de previdência (FIE): a rentabilidade é a da cota do fundo, antes das taxas do plano (carregamento) cobradas pela seguradora; a base pode incluir fundos de planos específicos de empresas." : ""}</div>` : ""}
+      ${sel.some((f) => f.listado) ? `<div class="small muted" style="margin-top:6px">${LST_BADGE("LISTADO")} Fundos listados na B3: rentabilidade = <b>retorno total</b> (preço de fechamento + proventos reinvestidos na data ex), desde a data em que o histórico oficial de proventos está completo. Não têm benchmark com série pública: compare com o CDI. Detalhes de renda na página <a href="#/renda">Renda</a>.${sel.some((f) => f.base_ret === "preco") ? ` ETFs sem nenhum provento registrado pela B3 (${sel.filter((f) => f.base_ret === "preco").map((f) => esc(f.ticker)).join(", ")}): rentabilidade = variação da cota, com histórico completo; distribuições anteriores a ${fmt.date((sel.find((f) => f.base_ret === "preco").renda || {}).cobertura)}, se houver, não estão incluídas.` : ""}</div>` : ""}
       <div id="cmp-body"></div>`;
     const dm = root.querySelector("[data-drop-missing]");
     if (dm) dm.addEventListener("click", (e) => { e.preventDefault(); missing.forEach((id) => App.toggleSelect(id, false)); });
@@ -68,26 +73,36 @@
       const hit = (txt, cnpj) => !q || norm(txt).includes(q) || (qd.length >= 4 && cnpj.replace(/\D/g, "").includes(qd));
       const base = App.funds.filter((f) => !App.state.selection.includes(f.id) && !onlyPrev && hit(f.nome + " " + f.familia + " " + f.categoria, f.cnpj))
         .slice(0, q ? 6 : 12).map((f) => ({ id: f.id, nome: f.nome, sub: `${f.categoria} · ${f.cnpj}${f.previdencia ? " · versão previdência disponível" : ""}`, grupo: "Prateleira" }));
-      let mk = [], status = "";
+      let mk = [], ls = [], status = "";
+      if (App.lst.index && q.length >= 2 && !onlyPrev) {
+        const qq = q.replace(/\s/g, "");
+        ls = App.lst.index.fundos.filter((r) => !App.state.selection.includes(r[0]) && (norm(r[1]).startsWith(qq) || hit(r[2] + " " + r[4] + " " + r[18], r[17] || "")))
+          .sort((x, y) => (norm(y[1]).startsWith(qq) - norm(x[1]).startsWith(qq)) || (y[13] || 0) - (x[13] || 0)).slice(0, 8)
+          .map((r) => ({ id: r[0], nome: r[2], sub: `${r[3]}${r[4] && r[4] !== r[3] ? " · " + r[4] : ""} · ${r[17] || ""} · liquidez ${fmt.money(r[13]) || "N/D"}/dia`, grupo: "Listados", tipo: r[3] }));
+      }
       if (App.mkt.index && q.length >= 2) {
         mk = App.mkt.index.fundos.filter((r) => !App.state.selection.includes(r[0]) && !baseCnpjs.has(r[2]) && (!onlyPrev || r[9]) && hit(r[1] + " " + r[3], r[2]))
           .sort((x, y) => (y[6] || 0) - (x[6] || 0)).slice(0, 12 - base.length)
           .map((r) => ({ id: r[0], nome: r[1], sub: `${r[4] || "—"} · ${r[3] || "gestor N/D"} · ${r[2]} · PL ${fmt.money(r[6]) || "N/D"}`, grupo: "Mercado", prev: !!r[9] }));
       } else if (App.mkt.failed) status = "Busca no mercado indisponível nesta versão (use o site ou dashboard/index.html).";
       else if (!App.mkt.index) status = "Carregando base de mercado…";
-      else if (q.length < 2) status = `Digite ao menos 2 letras para buscar entre ${fmt.int(App.mkt.index.meta.n)} fundos de mercado (${fmt.int(App.mkt.index.meta.n_prev || 0)} de previdência).`;
-      items = base.concat(mk);
+      else if (q.length < 2) status = `Digite ao menos 2 letras (nome, CNPJ ou ticker) para buscar entre ${fmt.int(App.mkt.index.meta.n)} fundos de mercado (${fmt.int(App.mkt.index.meta.n_prev || 0)} de previdência)${App.lst.index ? ` e ${fmt.int(App.lst.index.meta.n)} fundos listados na B3` : ""}.`;
+      items = base.concat(ls, mk);
       let h = "", grp = null;
       items.forEach((it, i) => {
-        if (it.grupo !== grp) { grp = it.grupo; h += `<div class="ac-group">${grp === "Mercado" ? "Mercado (CVM)" : "Sua prateleira"}</div>`; }
-        h += `<button type="button" role="option" data-id="${esc(it.id)}" class="${i === hl ? "hl" : ""}">${esc(it.nome)}${it.grupo === "Mercado" ? " " + MKT_BADGE : ""}${it.prev ? " " + PREV_BADGE : ""}<small>${esc(it.sub)}</small></button>`;
+        if (it.grupo !== grp) { grp = it.grupo; h += `<div class="ac-group">${grp === "Mercado" ? "Mercado (CVM)" : grp === "Listados" ? "Listados na B3 (FII, Fiagro, FI-Infra, ETF)" : "Sua prateleira"}</div>`; }
+        h += `<button type="button" role="option" data-id="${esc(it.id)}" class="${i === hl ? "hl" : ""}">${esc(it.nome)}${it.grupo === "Mercado" ? " " + MKT_BADGE : ""}${it.grupo === "Listados" ? " " + LST_BADGE(it.tipo) : ""}${it.prev ? " " + PREV_BADGE : ""}<small>${esc(it.sub)}</small></button>`;
       });
       if (status) h += `<div class="small muted" style="padding:8px 12px">${esc(status)}</div>`;
       list.innerHTML = h || '<div class="small muted" style="padding:10px 12px">Nenhum fundo encontrado</div>';
       list.classList.remove("hidden");
     };
-    const pick = (it) => { if (!it) return; if (it.grupo === "Mercado") App.rememberName(it.id, it.nome); App.toggleSelect(it.id, true); };
-    inp.addEventListener("focus", () => { show(); if (!App.mkt.index && !App.mkt.failed) App.mkt.loadIndex().then(show, show); });
+    const pick = (it) => { if (!it) return; if (it.grupo !== "Prateleira") App.rememberName(it.id, it.nome); App.toggleSelect(it.id, true); };
+    inp.addEventListener("focus", () => {
+      show();
+      if (!App.mkt.index && !App.mkt.failed) App.mkt.loadIndex().then(show, show);
+      if (!App.lst.index && !App.lst.failed) App.lst.loadIndex().then(show, show);
+    });
     inp.addEventListener("input", () => { hl = 0; show(); });
     inp.addEventListener("keydown", (e) => {
       if (e.key === "ArrowDown") { hl = Math.min(hl + 1, items.length - 1); show(); e.preventDefault(); }
@@ -198,7 +213,11 @@
       ...App.windows.map((w) => [`${w.label}`, (f) => App.cell((f.ret[w.id] || {}).f, "pct", (f.ret[w.id] || {}).nd)]),
       ...App.windows.filter((w) => w.type === "months" && w.n >= 24).map((w) => [`${w.label} anualizada`, (f) => App.cell((f.ret[w.id] || {}).fa, "pct", (f.ret[w.id] || {}).nd)]),
       ["Benchmark", null],
-      ["Benchmark", (f) => (f.benchmark_id ? esc(App.benchName(f.benchmark_id)) + (f.mercado ? ' <span class="small muted">(indicador CVM)</span>' : "") : App.ND(`Indicador informado à CVM: ${f.indicador_cvm || "não informado"} — sem série pública`))],
+      ["Benchmark", (f) => (f.benchmark_id ? esc(App.benchName(f.benchmark_id)) + (f.mercado ? ' <span class="small muted">(indicador CVM)</span>' : "") : f.listado ? App.ND("Fundo listado: sem benchmark com série pública (ex.: IFIX não disponível). Compare com o CDI.") : App.ND(`Indicador informado à CVM: ${f.indicador_cvm || "não informado"} — sem série pública`))],
+      ...(sel.some((f) => f.listado) ? [
+        ["CDI no período 12M", (f) => (f.listado ? App.cell((f.ret["12m"] || {}).cdi, "pct", "CDI indisponível", { color: false }) : '<span class="muted">—</span>')],
+        ["Retorno total − CDI 12M", (f) => (f.listado ? App.cell((f.ret["12m"] || {}).x_cdi, "pp", (f.ret["12m"] || {}).nd) : '<span class="muted">—</span>')],
+      ] : []),
       ["Benchmark 12M", (f) => App.cell((f.ret["12m"] || {}).b, "pct", (f.ret["12m"] || {}).nd_b, { color: false })],
       ["Excesso 12M", (f) => App.cell((f.ret["12m"] || {}).x, "pp", (f.ret["12m"] || {}).nd || (f.ret["12m"] || {}).nd_b)],
       ["Excesso 36M a.a.", (f) => App.cell((f.ret["36m"] || {}).xa, "pp", (f.ret["36m"] || {}).nd || (f.ret["36m"] || {}).nd_b)],
@@ -209,7 +228,15 @@
       ["Máximo drawdown", (f) => App.metricCell(f, "mdd:" + rw)],
       ["% meses positivos", (f) => App.metricCell(f, "mpos:" + rw)],
       ["% meses acima do bench.", (f) => App.metricCell(f, "macima:" + rw)],
-      ["Objetivo (gestora)", (f) => (f.alvo ? `<span class="small">${esc(f.alvo_tipo)}: ${esc(f.alvo)}</span>` : App.ND(f.mercado ? "Fundo de mercado: sem material da gestora" : undefined))],
+      ["Objetivo (gestora)", (f) => (f.alvo ? `<span class="small">${esc(f.alvo_tipo)}: ${esc(f.alvo)}</span>` : App.ND(f.mercado || f.listado ? "Fundo fora da planilha-base: sem material da gestora" : undefined))],
+      ...(sel.some((f) => f.listado) ? [
+        ["Renda (fundos listados)", null],
+        ["DY 12M (s/ preço atual)", (f) => (f.listado ? App.cell((f.renda || {}).dy12, "pct", App.LST_ND_PROV(f), { sign: false, color: false }) : '<span class="muted">—</span>')],
+        ["Proventos 12M (R$/cota)", (f) => (f.listado ? ((f.renda || {}).prov12 == null ? App.ND(App.LST_ND_PROV(f)) : `<span class="num">${fmt.num(f.renda.prov12, 2)}</span>`) : '<span class="muted">—</span>')],
+        ["Variação da cota 12M", (f) => (f.listado ? App.cell(((f.ret_preco || {})["12m"] || {}).f, "pct", ((f.ret_preco || {})["12m"] || {}).nd) : '<span class="muted">—</span>')],
+        ["P/VP", (f) => (f.listado ? App.cell((f.renda || {}).pvp, "ratio", "Valor patrimonial da cota não disponível na CVM") : '<span class="muted">—</span>')],
+        ["Liquidez média diária 3M", (f) => (f.listado ? App.cell((f.liq || {}).vol_3m, "money", "Histórico de negociação insuficiente") : '<span class="muted">—</span>')],
+      ] : []),
       ["Fundo", null],
       ["Categoria", (f) => esc(f.categoria) + (f.mercado && f.cvm.classificacao_anbima ? `<div class="small muted">${esc(f.cvm.classificacao_anbima)}</div>` : "")],
       ["Gestor", (f) => `<span class="small">${esc((f.cvm || {}).gestor || "N/D")}</span>`],
@@ -218,14 +245,14 @@
       ["Cotistas", (f) => App.metricCell(f, "cotistas")],
       ["Início", (f) => App.metricCell(f, "inicio")],
       ["Liquidez e custos", null],
-      ["Aplic. / cotiz. / crédito", (f) => (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : `<span class="num">${App.liquidityText(f)}</span>`)],
-      ["Taxa de administração", (f) => (f.taxa_adm == null ? (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : App.ND()) : `<span class="num">${fmt.num(f.taxa_adm, 2)}% a.a.</span>`)],
-      ["Taxa de performance", (f) => (f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : f.taxa_perf == null ? "Não há" : `<span class="num">${fmt.num(f.taxa_perf, 0)}%</span> <span class="small muted">s/ ${esc(f.taxa_perf_indice || "")}</span>`)],
-      ["Público", (f) => (f.mercado ? esc((f.cvm || {}).publico_alvo || "N/D") : f.qualificado ? "Qualificado" : "Geral")],
-      ["Tributação", (f) => (f.mercado ? esc(App.tribText((f.cvm || {}).tributacao_lp) || "N/D") : f.isento_ir ? "Isento (PF)" : "Tributado")],
+      ["Aplic. / cotiz. / crédito", (f) => (f.listado ? App.ND(NA_LST) : f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : `<span class="num">${App.liquidityText(f)}</span>`)],
+      ["Taxa de administração", (f) => (f.taxa_adm == null ? (f.listado ? App.ND(NA_LST) : f.mercado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : App.ND()) : `<span class="num">${fmt.num(f.taxa_adm, 2)}% a.a.</span>`)],
+      ["Taxa de performance", (f) => (f.mercado || f.listado ? App.ND("Fundo de mercado: informação não disponível em base pública estruturada (consultar regulamento/lâmina)") : f.taxa_perf == null ? "Não há" : `<span class="num">${fmt.num(f.taxa_perf, 0)}%</span> <span class="small muted">s/ ${esc(f.taxa_perf_indice || "")}</span>`)],
+      ["Público", (f) => (f.mercado || f.listado ? esc((f.cvm || {}).publico_alvo || "N/D") : f.qualificado ? "Qualificado" : "Geral")],
+      ["Tributação", (f) => (f.listado ? (f.renda && f.renda.isento_ir != null ? (f.renda.isento_ir ? "Rendimentos isentos (PF), conforme aviso ao cotista" : "Rendimentos tributados, conforme aviso ao cotista") : App.ND("Consultar regulamento (a isenção de IR depende do tipo de fundo e de condições legais)")) : f.mercado ? esc(App.tribText((f.cvm || {}).tributacao_lp) || "N/D") : f.isento_ir ? "Isento (PF)" : "Tributado")],
       ["Estratégia", (f) => `<span class="small" style="white-space:normal;display:block;max-width:260px;text-align:left;color:var(--text-2)">${esc(f.descricao || "N/D")}</span>`],
     ];
-    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l">${App.swatch(f.id)}${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}</th>`).join("")}</tr></thead><tbody>` +
+    body.querySelector("#cmp-table").innerHTML = `<thead><tr><th class="l">Indicador</th>${sel.map((f) => `<th class="l">${App.swatch(f.id)}${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}${f.listado ? " " + LST_BADGE(f.tipo) : ""}</th>`).join("")}</tr></thead><tbody>` +
       rows.map(([label, fn]) => (fn ? `<tr style="cursor:default"><td class="l">${label}</td>${sel.map((f) => `<td class="${label === "Estratégia" ? "l" : ""}">${fn(f)}</td>`).join("")}</tr>` : `<tr><td class="group-h" colspan="${sel.length + 1}">${label}</td></tr>`)).join("") + "</tbody>";
   }
 

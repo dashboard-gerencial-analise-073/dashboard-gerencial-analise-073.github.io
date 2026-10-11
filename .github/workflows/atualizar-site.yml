@@ -10,7 +10,7 @@ on:
   # Publica também quando código, dashboard ou planilha-base forem enviados ao GitHub.
   push:
     branches: [main]
-    paths: ["pipeline/**", "dashboard/**", "data/input/**", "requirements.txt", ".github/workflows/**"]
+    paths: ["pipeline/**", "dashboard/**", "data/input/**", "data/historico/**", "requirements.txt", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       data_base:
@@ -30,7 +30,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Inclui a coleta de fundos listados (cotações B3 e avisos do Fundos.NET, limitada por config.LISTADOS).
+    timeout-minutes: 120
     outputs:
       publicar: ${{ steps.pipeline.outputs.publicar }}
     steps:
@@ -43,7 +44,8 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      # Downloads da CVM/BCB (~600 MB) e extrações ficam em cache entre execuções.
+      # Downloads da CVM/BCB/B3 (~1 GB) e extrações ficam em cache entre execuções. Os históricos acumulados de
+      # proventos (data/historico) vêm do repositório e são completados pela cópia em cache (data/raw/listados).
       - name: Restaurar cache de dados
         uses: actions/cache/restore@v4
         with:

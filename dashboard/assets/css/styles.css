@@ -320,8 +320,9 @@ footer b { color: var(--text-2); font-weight: 600; }
   footer { padding-bottom: 0; }
 }
 
-/* Fundos de mercado (Comparação) */
+/* Fundos de mercado (Comparação) e listados na B3 (Renda) */
 .badge.mkt { background: #ece8f7; color: #4a3aa7; }
+.badge.lst { background: #e0f2ec; color: #12684a; }
 .ac-group { padding: 8px 12px 4px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: 1px solid var(--line); }
 .ac-group:first-child { border-top: 0; }
 

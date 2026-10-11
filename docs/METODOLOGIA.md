@@ -13,6 +13,10 @@ Implementação de referência: `pipeline/metrics.py`.
 | Ibovespa | Yahoo Finance (^BVSP) — secundária | A série do BCB (SGS 7) foi descontinuada em 2019. |
 | Categoria, estratégia, taxas, prazos, público, alvos | Material comercial da gestora | Sem data de referência no documento. |
 | Carteiras (posições, sigilo, PL da carteira) | CVM — CDA (`cda_fi_AAAAMM.zip`) | Mensal; divulgação de posições pode ser postergada (sigilo). |
+| Preço de FII, Fiagro, FI-Infra, ETF (diário) | B3 — COTAHIST (séries históricas) | Fechamento, volume e nº de negócios por ticker. |
+| Ticker × CNPJ, proventos (12 meses), desdobramentos/grupamentos | B3 — Fundos listados (eventos corporativos) | Proventos acumulados entre execuções. |
+| Proventos de FII/Fiagro antes da janela da B3 | B3 — Fundos.NET (aviso aos cotistas estruturado) | XML enviado pelo administrador. |
+| PL, valor patrimonial da cota, cotistas, segmento de FII/Fiagro | CVM — Informe mensal FII / Fiagro | Último mês ≤ data-base. |
 | IMA-B, IMA-B 5, IFIX, SMLL, IPCA+Yield IMA-B | — | Sem série pública estruturada: comparações N/D. ETFs **não** são usados como proxy. |
 
 Validação cruzada automática: CNPJ (dígito verificador + existência na CVM), nome comercial ×
@@ -97,7 +101,57 @@ correlação é calculada sob demanda na página de comparação.
 - Salto diário de cota acima de 2× o limite de retorno suspeito: a série passa a valer só a partir do salto.
 - Saída: `dashboard/data/mercado/indice.js` (busca) e `s/NNN.js` (lotes carregados sob demanda).
 
-## 9. Tratamento de dados
+## 9. Fundos listados na B3 (páginas Renda e Comparação) — `pipeline/listados.py`, `pipeline/b3.py`
+
+- **Universo**: lista "Fundos listados" da B3 (tipos em `config.LISTADOS["tipos"]`: FII, Fiagro, FI-Infra e ETFs), com ticker e
+  CNPJ pela ficha de cada fundo na B3. Entram os que tiveram negócio no último mês até a data-base.
+- **Preço**: fechamento oficial do COTAHIST (B3), mercado à vista (TPMERC 010), dividido pelo fator de cotação. Anos fechados
+  pelo arquivo anual; ano corrente pelos arquivos mensais e diários.
+- **Eventos de cotas** (eventos corporativos da B3, histórico completo): desdobramento e bonificação, com fator em %
+  (cotas × (1 + fator/100)), e grupamento, com fator = cotas novas por cota antiga. O preço anterior ao evento é dividido pelo
+  multiplicador. Cada evento é conferido com o salto de preço observado (tolerância de 30%). Se não bater, ou se houver
+  variação acima de 50% em um pregão sem evento, a série passa a valer só depois dele (alertas `EVENTO_COTAS` e `SALTO_PRECO`).
+- **Proventos** (R$ por cota, data-com; rendimentos e amortizações):
+  1. eventos corporativos da B3: proventos com data-com nos 365 dias anteriores à coleta. A cada execução a coleta é somada
+     ao histórico (`data/historico/eventos_b3.json`), então a cobertura cresce com o tempo;
+  2. antes dessa janela, só para FII e Fiagro: avisos aos cotistas estruturados ("Rendimentos e Amortizações") do Fundos.NET,
+     enviados pelos administradores (`data/historico/fnet_rendimentos.json`). Se houver mais de um aviso para a mesma data-com,
+     vale o mais recente (reapresentação). Um mês de data-com só é considerado coberto quando os avisos entregues no mês
+     anterior, no próprio mês e no seguinte foram todos lidos. A coleta tem limite de tempo por execução
+     (`fnet_orcamento_min`) e é completada ao longo das execuções.
+  - Fora da cobertura comprovada, proventos, DY e retorno total ficam **N/D**: nunca se presume "sem provento".
+  - Valores na base atual de cotas = valor original ÷ eventos de cotas posteriores à data-com.
+  - Fontes não oficiais (ex.: Yahoo) foram testadas e descartadas: faltavam pagamentos e o histórico era incompleto.
+- **Preço de referência numa data**: último fechamento em até 5 pregões antes, para fundos pouco negociados. O risco usa só
+  pregões consecutivos com negócio.
+- **Retorno total** (proventos reinvestidos na data ex = 1º pregão após a data-com), entre pregões consecutivos k < j:
+  `RT_j = RT_k × (P_j + D) / P_k`, com D = proventos com data-com em [data_k, data_j). A série começa no 1º pregão em que todos os
+  proventos seguintes são conhecidos. Janelas, anualização e risco (vol., drawdown, Sharpe vs CDI) são calculados com as
+  funções de `metrics.py`. **Variação da cota** = só o preço ajustado.
+- **DY**: `DY(período) = Σ proventos com data-com no período ÷ fechamento no início do período`. No mês, usa o fechamento do mês
+  anterior; no ano, o do ano anterior; nas janelas N meses, o preço no início da janela. **DY 12M sobre o preço atual** =
+  proventos dos últimos 12 meses ÷ preço na data-base.
+- **Regularidade**: meses com pagamento (12M e 24M). Coeficiente de variação dos proventos mensais em 12M (meses sem provento
+  contam como zero). Tendência = média dos últimos 6 meses ÷ média dos 6 anteriores − 1.
+- **P/VP** = preço na data-base ÷ valor patrimonial da cota da CVM: informe mensal de FII e de Fiagro (último mês ≤ data-base);
+  para FI-Infra e ETFs, informe diário. O VP é ajustado por eventos de cotas posteriores à sua data. Com P/VP fora de 0,1–10,
+  o VP é considerado incompatível (base ou unidade diferente) e o P/VP não é exibido (`PVP_INCOERENTE`).
+- **Liquidez**: volume financeiro médio diário (3 e 12 meses) = volume total ÷ pregões do período, e % de pregões com negócio.
+- **Referência**: não há benchmark com série pública para esses fundos (IFIX, IMA-B etc.). Exibe-se o CDI no mesmo período,
+  sem tratá-lo como benchmark. Valores brutos de IR, corretagem e emolumentos.
+- **Simulador de carteira de renda** (página Renda): para cada fundo, cotas inteiras = ⌊valor alocado ÷ preço na data-base⌋
+  (a sobra fica fora). Renda do mês = cotas × rendimentos por cota com data-com no mês (base atual de cotas), com as mesmas
+  cotas nos 12 meses anteriores e sem reinvestir. Amortizações aparecem à parte. Média, mínimo e máximo usam só os meses com
+  histórico oficial (quantos meses, quando forem menos de 12). Total da carteira só quando todos os fundos têm o dado do mês.
+  Referência: valor investido × CDI do mês (bruto). Mostra renda passada, não projeção.
+- **Simulação de renda** (página Renda): compra pelo fechamento no início do período, com cotas fracionárias e sem custos;
+  proventos recebidos em dinheiro (data-com até a data-base) e cotas avaliadas pelo fechamento na data-base. É só uma
+  ilustração com dados passados.
+- **Saída**: `dashboard/data/listados/indice.js` (ranking e busca) e `s/NNN.js` (séries, proventos e tabelas mês a mês e ano a
+  ano), carregados sob demanda. Também vão para as abas `Listados_Renda` e `Listados_Proventos` da planilha consolidada. Não
+  são embutidos no HTML único.
+
+## 10. Tratamento de dados
 
 - Nada é interpolado, estimado ou preenchido. Cota 0 reportada à CVM = ausente.
 - Subclasses (RCVM 175): série da classe; se a CVM passar a reportar só por subclasse, continua pela
@@ -106,7 +160,7 @@ correlação é calculada sob demanda na página de comparação.
 - Variação diária acima de 8% (15% para renda variável) é sinalizada para conferência (pode ser evento
   societário, amortização, erro de reporte) — não é removida automaticamente.
 
-## 10. Controle de qualidade (automático)
+## 11. Controle de qualidade (automático)
 
 Erros, alertas e informativos ficam na página *Metodologia e fontes* e na aba *Qualidade* da planilha:
 CNPJ inválido/duplicado, id duplicado, gestora/benchmark inexistente, fundo não localizado na CVM,

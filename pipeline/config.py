@@ -75,6 +75,18 @@ MERCADO = {
     "descricao": "classes abertas, em funcionamento normal, PL ≥ R$ 10 mi na data-base; não exclusivas e com ≥ 100 cotistas, exceto fundos de previdência (cujo cotista é a seguradora)",
 }
 
+# Fundos listados na B3 (página Renda e busca da Comparação): FII, Fiagro, FI-Infra e ETFs.
+LISTADOS = {
+    "ativo": True,
+    # Tipos da B3 (lista "Fundos listados"). FIDC/FIP listados ficam de fora (pouca negociação e sem preço regular).
+    "tipos": ["FII", "FIAGRO", "FIAGRO-FII", "FI-INFRA", "ETF", "ETF-RF", "ETF-FII", "ETF-INT-RF", "ETF-MOEDA", "ETF-CRIPTO"],
+    # Avisos de rendimentos do Fundos.NET (histórico de FII/Fiagro): tempo máximo de download por execução.
+    # O histórico é completado aos poucos (cada aviso é baixado uma única vez e guardado em data/raw/listados).
+    "fnet_orcamento_min": 20,
+    "fnet_threads": 6,
+    "shards": 64,
+}
+
 # Meses de histórico além da maior janela (margem para datas de início).
 HISTORY_MARGIN_MONTHS = 2
 
@@ -94,6 +106,14 @@ SOURCES = [
      "url": "https://www3.bcb.gov.br/sgspub/"},
     {"nome": "Yahoo Finance (^BVSP) — fonte secundária", "uso": "Ibovespa (série oficial do BCB descontinuada em 2019)",
      "url": "https://finance.yahoo.com/quote/%5EBVSP/"},
+    {"nome": "B3 — Cotações históricas (COTAHIST)", "uso": "Fechamento e volume diários de FII, Fiagro, FI-Infra e ETFs",
+     "url": "https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/market-data/historico/mercado-a-vista/series-historicas/"},
+    {"nome": "B3 — Fundos listados (eventos corporativos)", "uso": "Ticker × CNPJ, proventos (12 meses), desdobramentos e grupamentos",
+     "url": "https://sistemaswebb3-listados.b3.com.br/fundsListedPage/"},
+    {"nome": "B3 — Fundos.NET (avisos aos cotistas estruturados)", "uso": "Histórico de rendimentos e amortizações de FII e Fiagro",
+     "url": "https://fnet.bmfbovespa.com.br/fnet/publico/abrirGerenciadorDocumentosCVM"},
+    {"nome": "CVM — Informe mensal de FII e de Fiagro", "uso": "PL, valor patrimonial da cota, cotistas e segmento de FII/Fiagro",
+     "url": "https://dados.cvm.gov.br/dataset/fii-doc-inf_mensal"},
     {"nome": "Itaú Asset Management — material comercial (prateleira de fundos)", "uso": "Categoria, estratégia, taxas, cotização, alvos, público",
      "url": "https://www.itauassetmanagement.com.br"},
 ]

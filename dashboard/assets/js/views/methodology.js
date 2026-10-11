@@ -87,6 +87,21 @@ Information ratio = (Retorno a.a. fundo − Retorno a.a. índice) / Tracking err
             <li>Sem dados comerciais da gestora (taxas, prazos de cotização/liquidação, objetivo, estratégia): N/D. Variação diária atípica de cota (eventos, troca de classe) interrompe a série a partir dela.</li>
           </ul>
 
+          <h3>Fundos listados na B3 (páginas Renda e Comparação)</h3>
+          <ul>
+            <li>${m.listados ? `<b>${fmt.int(m.listados.n)} fundos</b> negociados na B3 no último mês até a data-base (${Object.entries(m.listados.por_tipo || {}).map(([k, v]) => `${esc(k)} ${v}`).join(", ")})` : "Fundos listados (base não gerada nesta versão)"}: FII, Fiagro, FI-Infra e ETFs. Ticker e CNPJ pela lista de fundos listados da B3.</li>
+            <li><b>Preço</b>: fechamento oficial (COTAHIST, B3), mercado à vista, ajustado por desdobramentos e grupamentos informados pela B3. Cada evento é conferido com o salto de preço observado; se não bater (ou se houver salto acima de 50% sem evento), a série passa a valer só depois dele. Em fundos pouco negociados, o preço numa data é o último fechamento em até 5 pregões antes.</li>
+            <li><b>Proventos</b> (R$ por cota, pela data-com): eventos corporativos da B3 (janela dos últimos 12 meses, acumulada a cada atualização) e, para FII e Fiagro, avisos aos cotistas estruturados do Fundos.NET (enviados pelos administradores) para o período anterior. Rendimentos e amortizações são separados. Um mês só entra no cálculo se o histórico oficial cobrir todo o mês; antes disso, DY e retorno total ficam N/D — nunca se presume “sem provento”.</li>
+            <li><b>Retorno total</b> (proventos reinvestidos na data ex, 1º pregão após a data-com), entre pregões consecutivos com negócio:
+              <span class="formula">RT(j) = RT(k) × (Preço(j) + Proventos com data-com em [k, j)) / Preço(k)</span>
+              As janelas, a anualização e o risco (volatilidade, drawdown, Sharpe vs CDI) seguem as mesmas regras dos demais fundos. <b>Variação da cota</b> = só o preço, sem proventos.</li>
+            <li><b>DY</b>: <code>DY(período) = proventos com data-com no período ÷ preço de fechamento no início do período</code> (mês: fechamento do mês anterior; ano: fechamento do ano anterior). <b>DY 12M sobre o preço atual</b> = proventos dos últimos 12 meses ÷ preço na data-base.</li>
+            <li><b>Regularidade</b>: meses com pagamento e coeficiente de variação dos proventos mensais (desvio-padrão ÷ média, 12 meses; meses sem provento contam como zero). <b>Tendência</b>: média dos últimos 6 meses ÷ média dos 6 anteriores − 1.</li>
+            <li><b>P/VP</b> = preço ÷ valor patrimonial da cota informado à CVM (informe mensal de FII/Fiagro; informe diário para FI-Infra e ETFs), ajustado a eventos de cotas posteriores. VP incompatível com o preço (P/VP fora de 0,1–10) não é exibido. <b>Liquidez</b> = volume financeiro médio diário na B3.</li>
+            <li><b>Simulador de carteira de renda</b> (página Renda): cotas inteiras = valor alocado ÷ preço na data-base (arredondado para baixo); renda do mês = cotas × rendimentos por cota com data-com no mês, mantendo as mesmas cotas nos 12 meses anteriores, sem reinvestir. Amortizações à parte. Total da carteira só quando todos os fundos têm o dado do mês. É renda passada, não projeção.</li>
+            <li>Fundos listados não têm benchmark com série pública (IFIX, IMA-B etc. não estão disponíveis): a referência exibida é o CDI no mesmo período. Valores brutos de IR, corretagem e emolumentos.</li>
+          </ul>
+
           <h3>Tratamento de dados</h3>
           <ul>
             <li><b>Calendário</b>: dias úteis definidos pelas datas da série do CDI (BCB), o que exclui feriados nacionais. Cotas em datas fora do calendário são ignoradas e registradas.</li>

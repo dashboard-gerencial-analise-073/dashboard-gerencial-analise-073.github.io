@@ -24,7 +24,7 @@
 
   /* ---------------- Formatação ---------------- */
   const nf = (d) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-  const NF = { 0: nf(0), 1: nf(1), 2: nf(2), 3: nf(3) };
+  const NF = { 0: nf(0), 1: nf(1), 2: nf(2), 3: nf(3), 4: nf(4) };
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   App.esc = esc;
   const ND = (why) => `<span class="nd" title="${esc(why || "Informação não disponível")}">N/D</span>`;
@@ -111,7 +111,8 @@
     retMode: store.get("retMode", "abs"),     // abs | excess | pctb
     retBase: store.get("retBase", "cum"),     // cum | ann
     riskWin: store.get("riskWin", "12m"),
-    selection: store.get("selection", []).filter((id) => App.byId[id] || String(id).startsWith("m:")),
+    selection: store.get("selection", []).filter((id) => App.byId[id] || /^[ml]:/.test(String(id))),
+    rendaSel: store.get("rendaSel", []).filter((id) => String(id).startsWith("l:")),
   };
   const listeners = {};
   App.on = (ev, fn) => { (listeners[ev] = listeners[ev] || []).push(fn); };
@@ -147,32 +148,48 @@
      data/mercado/indice.js  -> window.__MKT_INDEX({meta, fundos: [[id, nome, cnpj, gestor, classe, anbima, pl, r12, lote], ...]})
      data/mercado/s/NNN.js   -> window.__MKT_SHARD(NNN, {id: fundo, ...})
      Carregados por <script> (funciona também abrindo o HTML direto do disco). */
-  const MKT_DIR = "data/mercado/";
-  const mkt = (App.mkt = { index: null, byId: {}, funds: {}, shards: {}, indexPromise: null, failed: false });
   const loadScript = (src) => new Promise((ok, fail) => {
     const el = document.createElement("script");
     el.src = src; el.onload = ok; el.onerror = () => fail(new Error("Não foi possível carregar " + src));
     document.head.appendChild(el);
   });
-  window.__MKT_INDEX = (d) => { mkt.index = d; };
-  window.__MKT_SHARD = (n, funds) => { mkt.shards[n] = true; Object.assign(mkt.funds, funds); };
-  mkt.loadIndex = () => mkt.indexPromise || (mkt.indexPromise = loadScript(MKT_DIR + "indice.js").then(() => {
-    if (!mkt.index) throw new Error("Índice de mercado vazio");
-    if (mkt.index.meta.data_base !== App.meta.data_base) throw new Error("Base de mercado com data-base diferente do relatório — gere novamente");
-    mkt.byId = Object.fromEntries(mkt.index.fundos.map((r) => [r[0], r]));
-    return mkt.index;
-  }).catch((e) => { mkt.failed = true; mkt.error = e.message; throw e; }));
-  mkt.ensure = async (ids) => {
-    const need = ids.filter((id) => String(id).startsWith("m:") && !mkt.funds[id]);
-    if (!need.length) return;
-    await mkt.loadIndex();
-    const lotes = [...new Set(need.map((id) => (mkt.byId[id] || [])[8]).filter((x) => x != null))];
-    await Promise.all(lotes.filter((n) => !mkt.shards[n]).map((n) => loadScript(`${MKT_DIR}s/${String(n).padStart(3, "0")}.js`)));
-  };
-  App.getFund = (id) => App.byId[id] || mkt.funds[id] || null;
+  /* Base externa carregada sob demanda: índice (busca/ranking) + lotes com as séries.
+     prefix = prefixo dos ids ("m:" mercado, "l:" listados); lote = posição do nº do lote na linha do índice. */
+  function extSource(dir, cbIndex, cbShard, prefix, lote, nome) {
+    const src = { index: null, byId: {}, funds: {}, shards: {}, indexPromise: null, failed: false };
+    window[cbIndex] = (d) => { src.index = d; };
+    window[cbShard] = (n, funds) => { src.shards[n] = true; Object.assign(src.funds, funds); };
+    src.loadIndex = () => src.indexPromise || (src.indexPromise = loadScript(dir + "indice.js").then(() => {
+      if (!src.index) throw new Error(`Índice de ${nome} vazio`);
+      if (src.index.meta.data_base !== App.meta.data_base) throw new Error(`Base de ${nome} com data-base diferente do relatório — gere novamente`);
+      src.byId = Object.fromEntries(src.index.fundos.map((r) => [r[0], r]));
+      return src.index;
+    }).catch((e) => { src.failed = true; src.error = e.message; throw e; }));
+    src.ensure = async (ids) => {
+      const need = ids.filter((id) => String(id).startsWith(prefix) && !src.funds[id]);
+      if (!need.length) return;
+      await src.loadIndex();
+      const lotes = [...new Set(need.map((id) => (src.byId[id] || [])[lote]).filter((x) => x != null))];
+      await Promise.all(lotes.filter((n) => !src.shards[n]).map((n) => loadScript(`${dir}s/${String(n).padStart(3, "0")}.js`)));
+    };
+    return src;
+  }
+  const mkt = (App.mkt = extSource("data/mercado/", "__MKT_INDEX", "__MKT_SHARD", "m:", 8, "mercado"));
+  /* Fundos listados na B3 (FII, Fiagro, FI-Infra, ETF): data/listados/indice.js e s/NNN.js. */
+  const lst = (App.lst = extSource("data/listados/", "__LST_INDEX", "__LST_SHARD", "l:", 16, "fundos listados"));
+  App.lstRow = (r) => Object.fromEntries(lst.index.meta.campos.map((k, i) => [k, r[i]]));
+  App.ensureFunds = (ids) => Promise.allSettled([mkt.ensure(ids), lst.ensure(ids)]);
+  App.extFailed = (id) => (String(id).startsWith("l:") ? lst : mkt).failed;
+  App.extError = (id) => (String(id).startsWith("l:") ? lst : mkt).error;
+  App.getFund = (id) => App.byId[id] || mkt.funds[id] || lst.funds[id] || null;
   App.rememberName = (id, nome) => { const m = store.get("mktNames", {}); m[id] = nome; store.set("mktNames", m); };
-  App.fundName = (id) => (App.getFund(id) || {}).nome || store.get("mktNames", {})[id] || String(id).replace(/^m:/, "CNPJ ");
+  App.fundName = (id) => (App.getFund(id) || {}).nome || store.get("mktNames", {})[id] || (String(id).startsWith("l:") ? String(id).slice(2) : String(id).replace(/^m:/, "CNPJ "));
 
+  /* Motivo de N/D para indicadores de renda de fundos listados (cobertura do histórico de proventos). */
+  App.LST_ND_PROV = (f) => {
+    const c = ((f && f.renda) || {}).cobertura;
+    return c ? `Histórico oficial de proventos completo apenas para data-com a partir de ${App.fmt.date(c)} (B3: janela de 12 meses, acumulada a cada atualização)` : "Proventos não disponíveis";
+  };
   App.toast = function (msg) {
     let t = document.getElementById("toast");
     if (!t) {

@@ -99,6 +99,24 @@
     });
   };
 
+  /* Série mensal por categoria (eixo = meses). series: [{name, color, lineType, data:[v|null...]}].
+     bars=true desenha barras agrupadas (poucos fundos); senão linhas com marcadores. null = sem dado (N/D). */
+  C.monthly = function (el, labels, series, o = {}) {
+    const fmt = o.fmt || pct;
+    return C.mount(el, {
+      grid: { left: 8, right: 12, top: 40, bottom: 8, containLabel: true },
+      legend: { top: 0, left: 0, icon: o.bars ? "circle" : "roundRect", itemWidth: o.bars ? 8 : 12, itemHeight: o.bars ? 8 : 4, textStyle: { color: TEXT2, fontSize: 12 }, type: "scroll" },
+      tooltip: Object.assign({}, tooltipBase, { trigger: "axis", axisPointer: { type: o.bars ? "shadow" : "line", lineStyle: { color: AXIS }, shadowStyle: { color: "rgba(14,42,51,.04)" } },
+        formatter: (ps) => `<div class="tt"><div class="tt-h">${App.esc(ps[0].axisValue)}</div>${ps.map((p) => `<div class="row"><span>${dot(p.color, (series[p.seriesIndex].lineType || "solid") !== "solid")}${App.esc(p.seriesName)}</span><b>${p.value == null ? "N/D" : fmt(p.value)}</b></div>`).join("")}</div>` }),
+      xAxis: Object.assign({ type: "category", data: labels, boundaryGap: !!o.bars }, axisCommon, { axisLabel: { color: MUTED, fontSize: 11, hideOverlap: true } }),
+      yAxis: Object.assign({ type: "value", scale: !o.bars }, axisCommon, { axisLabel: { color: MUTED, fontSize: 11, formatter: (v) => fmt(v) } }),
+      series: series.map((s) => (o.bars && !s.line
+        ? { name: s.name, type: "bar", data: s.data, stack: o.stack ? "total" : undefined, barMaxWidth: o.stack ? 28 : 14, barGap: "10%", itemStyle: { color: s.color, borderRadius: o.stack ? 0 : 2 } }
+        : { name: s.name, type: "line", data: s.data, connectNulls: false, symbol: s.symbol || "circle", symbolSize: 6, showSymbol: true,
+            lineStyle: { width: s.dashed ? 1.5 : 2, type: s.dashed ? "dashed" : (s.lineType || "solid"), color: s.color }, itemStyle: { color: s.color }, z: s.dashed ? 1 : 2 })),
+    });
+  };
+
   /* Dispersão risco x retorno. points: [{id, name, x, y, color, muted, label}] */
   C.scatter = function (el, points, o = {}) {
     const byColor = {};

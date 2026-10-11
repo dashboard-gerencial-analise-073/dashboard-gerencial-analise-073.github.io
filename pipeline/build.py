@@ -19,6 +19,7 @@ import carteira  # noqa: E402
 import config  # noqa: E402
 import cvm  # noqa: E402
 import export_xlsx  # noqa: E402
+import listados  # noqa: E402
 import mercado  # noqa: E402
 import metrics as mt  # noqa: E402
 import quality  # noqa: E402
@@ -301,6 +302,9 @@ def main():
     log("   Fundos de mercado (página Comparação)…")
     mkt_meta = mercado.build(axis, i_base, cdi_idx, bench_series, bench_is_market, months, fundos, rnd, clean)
 
+    log("   Fundos listados na B3 (páginas Renda e Comparação)…")
+    lst_meta, lst_tab = listados.build(axis, i_base, cdi_idx, months, rnd, clean, offline=args.offline, qc_global=qc)
+
     log("5/6 Montando dataset…")
     cats = [c for c in config.CATEGORY_ORDER if any(f["categoria"] == c for f in out_funds)]
     cats += sorted({f["categoria"] for f in out_funds} - set(cats))
@@ -316,6 +320,7 @@ def main():
             "dias_uteis_ano": config.BUSINESS_DAYS_YEAR, "fontes": config.SOURCES,
             "categorias": cats,
             "mercado": mkt_meta,
+            "listados": lst_meta,
         },
         "gestoras": [{k: g.get(k) for k in ("gestora_id", "nome", "cnpj_gestor", "site")} for g in gestoras],
         "benchmarks": bench_meta,
@@ -335,7 +340,7 @@ def main():
 
     log("6/6 Exportando planilha consolidada e relatório em arquivo único…")
     config.OUTPUT_DIR.mkdir(exist_ok=True)
-    xlsx = export_xlsx.export(dataset, config.OUTPUT_DIR / f"base_fundos_{db.strftime('%Y%m%d')}.xlsx", carteiras_full)
+    xlsx = export_xlsx.export(dataset, config.OUTPUT_DIR / f"base_fundos_{db.strftime('%Y%m%d')}.xlsx", carteiras_full, lst_tab)
     log(f"  {xlsx}")
     import bundle  # noqa: E402
     html = bundle.build(config.OUTPUT_DIR / f"Relatorio_Fundos_{db.strftime('%Y%m%d')}.html")

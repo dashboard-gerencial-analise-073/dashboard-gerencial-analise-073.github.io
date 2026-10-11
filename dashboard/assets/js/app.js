@@ -30,7 +30,7 @@
     const cnt = document.getElementById("cmp-count");
     cnt.textContent = sel.length; cnt.classList.toggle("hidden", !sel.length);
     const route = (location.hash.split("/")[1] || "");
-    tray.classList.toggle("hidden", !sel.length || route === "comparacao");
+    tray.classList.toggle("hidden", !sel.length || route === "comparacao" || route === "renda");
     if (!sel.length) return;
     tray.innerHTML = `
       <div class="items">${sel.map((id) => `<span class="it">${App.swatch(id)}${App.esc(App.fundName(id))}<button type="button" data-rm="${id}" aria-label="Remover ${App.esc(App.fundName(id))}">×</button></span>`).join("")}</div>
@@ -47,7 +47,7 @@
   // Roteador
   const routes = {
     "visao-geral": V.overview, fundos: V.funds, fundo: V.detail,
-    comparacao: V.compare, analise: V.analysis, metodologia: V.methodology,
+    comparacao: V.compare, renda: V.renda, analise: V.analysis, metodologia: V.methodology,
   };
   let current = null;
   function go() {

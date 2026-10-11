@@ -27,7 +27,7 @@ def _sheet(wb, title, header, rows, formats=None):
     return ws
 
 
-def export(ds, path, carteiras=None):
+def export(ds, path, carteiras=None, listados=None):
     wb = Workbook()
     wb.remove(wb.active)
     wins = ds["meta"]["janelas"]
@@ -91,6 +91,23 @@ def export(ds, path, carteiras=None):
                                       "Código", "Emissor", "Vencimento", "Valor (R$)", "% PL"], rows,
                     {"Valor (R$)": MONEY, "% PL": PCT})
         ws.column_dimensions["F"].width = 60
+        ws.auto_filter.ref = ws.dimensions
+
+    if listados:
+        hdr = ["Ticker", "Fundo", "Tipo", "Segmento", "CNPJ", "ISIN", "Preço (R$)", "Data do preço", "DY 12M", "Proventos 12M (R$/cota)",
+               "Meses c/ pagamento 12M", "Coef. variação proventos 12M", "Amortizações 12M (R$/cota)", "Variação da cota 12M",
+               "Retorno total 12M", "CDI 12M", "Retorno total 24M a.a.", "Retorno total 36M a.a.", "Volatilidade 12M", "P/VP",
+               "Data do VP", "Liquidez média 3M (R$/dia)", "Liquidez média 12M (R$/dia)", "PL (R$)", "Cotistas",
+               "Proventos completos desde (data-com)", "Alertas"]
+        ws = _sheet(wb, "Listados_Renda", hdr, listados["resumo"],
+                    {**{h: PCT for h in ("DY 12M", "Variação da cota 12M", "Retorno total 12M", "CDI 12M", "Retorno total 24M a.a.",
+                                         "Retorno total 36M a.a.", "Volatilidade 12M")},
+                     "Preço (R$)": "0.00", "Proventos 12M (R$/cota)": "0.0000", "Amortizações 12M (R$/cota)": "0.0000", "P/VP": "0.00",
+                     "Coef. variação proventos 12M": "0.00", "Liquidez média 3M (R$/dia)": MONEY, "Liquidez média 12M (R$/dia)": MONEY, "PL (R$)": MONEY})
+        ws.auto_filter.ref = ws.dimensions
+        ws = _sheet(wb, "Listados_Proventos", ["Ticker", "Data-com", "Pagamento", "Valor (R$/cota, original)", "Valor (R$/cota, base atual)",
+                                               "Tipo", "Fonte", "Documento Fundos.NET"], listados["proventos"],
+                    {"Valor (R$/cota, original)": "0.00000000", "Valor (R$/cota, base atual)": "0.00000000"})
         ws.auto_filter.ref = ws.dimensions
 
     q = [[i["nivel"], i.get("fundo_id"), i["codigo"], i["mensagem"]] for i in ds["qualidade"]]

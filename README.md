@@ -36,6 +36,25 @@ Mesma metodologia, mas sem dados comerciais (taxas, liquidez, estratégia = N/D)
 com a planilha-base. A base de mercado (~95 MB em `dashboard/data/mercado/`) funciona no site e no
 `dashboard/index.html`; não é embutida no relatório em arquivo único. Para desligar: `MERCADO["ativo"] = False`.
 
+**Fundos listados (ETFs, FII, Fiagro, FI-Infra):** a busca da *Comparação* também encontra ~580 fundos negociados na B3
+(por ticker, nome ou CNPJ). Para eles, a rentabilidade é o **retorno total**: preço de fechamento + proventos reinvestidos.
+
+**Página *Renda*:** comparação de fundos listados que pagam rendimentos (FII, Fiagro, FI-Infra e ETFs que distribuem):
+- ranking filtrável (tipo, segmento, liquidez, "pagou nos 12 meses") com DY 12M, proventos, regularidade, variação da
+  cota, retorno total, P/VP, liquidez e PL;
+- **simulador de carteira de renda**: informe quanto aplicar em cada fundo marcado (R$ X no fundo A, R$ Y no B…) e veja a
+  renda mensal por fundo e da carteira — último mês, média, menor/maior mês, mês a mês nos últimos 12 meses (gráfico
+  empilhado) e o CDI sobre o mesmo valor como referência;
+- para os fundos marcados: quadro de renda, gráfico de proventos mês a mês (DY ou R$/cota), evolução de R$ 100 (retorno
+  total ou só a cota), simulação de renda ("R$ X investidos há N meses") contra o CDI, tabelas mês a mês e ano a ano
+  (DY, provento, variação da cota, retorno total) e últimos pagamentos.
+
+Fontes: preço da B3 (COTAHIST); proventos dos eventos corporativos da B3 (12 meses, acumulados a cada atualização) e,
+antes disso, dos avisos aos cotistas do Fundos.NET (FII/Fiagro); PL, VP e cotistas da CVM. Período sem histórico oficial de
+proventos = N/D. **Limitação atual:** para FI-Infra e ETFs só existe a janela de 12 meses da B3 (desde 08/10/2025); o histórico
+cresce a cada mês. ETFs que nunca registraram provento na B3 (ex.: BOVA11, IVVB11) usam a variação da cota, com histórico
+completo e aviso na tela. Para desligar: `LISTADOS["ativo"] = False` em `pipeline/config.py`.
+
 ## Versão online (GitHub Pages — sem custo)
 
 O repositório no GitHub atualiza e publica o site sozinho, pelo workflow
@@ -52,7 +71,8 @@ O repositório no GitHub atualiza e publica o site sozinho, pelo workflow
   (pelo site: abrir o arquivo no repositório → ícone de lápis/“Upload files”; ou `git commit` + `git push`).
   A publicação começa sozinha ao enviar.
 - **Custos:** nenhum. Repositório público → GitHub Actions e Pages gratuitos e sem limite de minutos.
-  Os dados brutos (~600 MB) ficam no cache do Actions, não no repositório.
+  Os dados brutos (~1 GB) ficam no cache do Actions, não no repositório. Os históricos de proventos que só se constroem
+  com o tempo ficam versionados em `data/historico/` (envie-os junto com o `git push`).
 - **Atenção:** o repositório e o site são públicos (inclui a planilha-base).
 
 ## Como atualizar os dados (local)
@@ -92,6 +112,11 @@ seguinte; o relatório usa a mais recente publicada.
 
 **CDI:** coletado da API do BCB; se ela estiver fora do ar, o pipeline usa automaticamente o módulo web do
 próprio SGS/BCB (mesma série) e confere os valores com a coleta anterior.
+
+**Fundos listados:** a primeira execução baixa as cotações da B3 (~400 MB) e começa a ler os avisos de rendimentos do
+Fundos.NET (~400 por mês de histórico, servidor lento). Cada execução gasta no máximo `LISTADOS["fnet_orcamento_min"]`
+minutos nisso (padrão 20) e continua de onde parou na próxima; até completar, o retorno total de FII/Fiagro fica limitado à
+janela da B3 (N/D antes dela).
 
 Requisitos: Python 3.10+ e `pip install -r requirements.txt` (apenas `openpyxl`). A primeira execução
 baixa ~550 MB da CVM e leva alguns minutos; as seguintes usam cache (`data/cache`).
@@ -143,6 +168,7 @@ Relatorio_Fundos/
 ├── requirements.txt
 ├── data/
 │   ├── input/cadastro_fundos.xlsx   # PLANILHA-BASE (única fonte editada manualmente)
+│   ├── historico/                   # proventos acumulados (eventos B3 + avisos Fundos.NET) — versionado
 │   ├── raw/                         # downloads oficiais (CVM, benchmarks) — cache
 │   └── cache/                       # extrações filtradas por mês
 ├── pipeline/
@@ -153,6 +179,8 @@ Relatorio_Fundos/
 │   ├── benchmarks.py   # CDI (BCB), Ibovespa
 │   ├── carteira.py     # carteiras (CDA/CVM), look-through e conciliação
 │   ├── mercado.py      # universo de fundos de mercado (só para a Comparação)
+│   ├── b3.py           # coleta B3 (COTAHIST, fundos listados, eventos) e Fundos.NET; informe mensal FII/Fiagro
+│   ├── listados.py     # fundos listados: retorno total, proventos, DY, P/VP (páginas Renda e Comparação)
 │   ├── metrics.py      # rentabilidade, risco, fluxos
 │   ├── quality.py      # controle de qualidade
 │   ├── export_xlsx.py  # planilha consolidada

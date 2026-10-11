@@ -56,5 +56,30 @@ Campos numéricos: `cotizacao_aplicacao_d`, `cotizacao_resgate_d`, `liquidacao_r
 
 Percentuais são frações decimais (0,0123 = 1,23%). Valores monetários em R$.
 
+## Saída — `dashboard/data/listados/` (fundos listados na B3)
+
+`indice.js` → `window.__LST_INDEX({meta, fundos})`: uma linha por fundo, na ordem de `meta.campos`
+(id, ticker, nome, tipo, segmento, preco, dy12, prov12, meses_pag12, var12, rt12, rt36a, pvp, liq3m, pl, vol12, lote, cnpj,
+gestor, cobertura, sem_proventos, cv12, rt24a, tipo_b3, n_prov). `meta`: data_base, n, por_tipo, fnet_cobertura,
+b3_cobertura, fnet_avisos.
+
+`s/NNN.js` → `window.__LST_SHARD(NNN, {id: fundo})`. Objeto do fundo listado (id `l:TICKER`):
+
+| Campo | Conteúdo |
+|---|---|
+| ticker, tipo (FII/Fiagro/FI-Infra/ETF), tipo_b3, subtipo, segmento, isin, cnpj, cvm | Cadastro (B3 + CVM). |
+| ret[janela] | Retorno total (mesmo formato dos fundos) + `cdi` (CDI no período) e `x_cdi` (diferença). |
+| ret_preco[janela] | Só variação da cota. |
+| risk[janela] | Risco do retorno total. |
+| renda | cobertura (data-com a partir da qual os proventos são completos), preco, preco_data, dy12, prov12, prov24, meses_pag12/24, prov_med12, prov_min12, prov_max12, cv12, tend6, amort12, dy_12m…dy_48m, ultimo{data_com, pagamento, valor, tipo, fonte}, isento_ir, pvp, vp, vp_data, vp_fonte. |
+| liq | vol_3m, vol_12m (R$/dia), pregoes_3m, pregoes_12m (fração de pregões com negócio). |
+| meses | `{"AAAA-MM": [proventos R$/cota, DY, variação da cota, retorno total, amortização]}` (null = fora da cobertura). |
+| anos | `{"AAAA": [proventos, DY do ano, variação, retorno total, nº de meses]}`. |
+| proventos | `[[data_com, pagamento, valor base atual, R/A, fonte B/F]]`. |
+| serie / serie_preco | `{i0, q[]}` — índice de retorno total / preço ajustado, alinhados ao eixo. |
+
+Históricos acumulados (versionados): `data/historico/eventos_b3.json` (eventos corporativos coletados, com a data da primeira
+coleta de cada fundo) e `data/historico/fnet_rendimentos.json` (avisos do Fundos.NET lidos, por id do documento).
+
 ## Saída — `output/base_fundos_AAAAMMDD.xlsx`
-Abas: Fontes, Fundos (cadastro + CVM + todos os indicadores), Rentab_Mensal, Cotas_Diarias, Carteiras (carteira consolidada completa de cada fundo), Qualidade.
+Abas: Fontes, Fundos (cadastro + CVM + todos os indicadores), Rentab_Mensal, Cotas_Diarias, Carteiras (carteira consolidada completa de cada fundo), Listados_Renda (resumo de renda dos fundos listados), Listados_Proventos (todos os proventos usados, com fonte e documento), Qualidade.

@@ -17,20 +17,32 @@ data/input/cadastro_fundos.xlsx   PLANILHA-BASE (única edição manual): abas G
 pipeline/  build.py (orquestra) · config.py (parâmetros) · cadastro.py · cvm.py (informe diário/cadastros)
            benchmarks.py (CDI BCB + fallback SGS web; Ibovespa Yahoo) · metrics.py · quality.py · carteira.py (CDA)
            mercado.py (universo de mercado p/ Comparação) · export_xlsx.py · bundle.py (HTML único) · util.py (feriados)
+           b3.py (coleta B3: COTAHIST, fundos listados, eventos; Fundos.NET; informe mensal FII/Fiagro)
+           listados.py (fundos listados: retorno total, proventos, DY, P/VP → páginas Renda e Comparação)
 dashboard/ index.html · assets/css/styles.css · assets/js/{core,charts,app}.js
-           views/{overview,funds,detail,portfolio,compare,analysis,methodology}.js · vendor/echarts.min.js
+           views/{overview,funds,detail,portfolio,compare,renda,analysis,methodology}.js · vendor/echarts.min.js
            data/dataset.js (gerado) · data/site.js (gerado) · data/mercado/{indice.js, s/NNN.js} (gerado)
+           data/listados/{indice.js, s/NNN.js} (gerado)
+data/historico/  eventos_b3.json + fnet_rendimentos.json — proventos acumulados (VERSIONADO; só cresce)
 output/    base_fundos_AAAAMMDD.xlsx · Relatorio_Fundos_AAAAMMDD.html (arquivo único)
 docs/      METODOLOGIA.md · DICIONARIO_DADOS.md · este arquivo
 .github/workflows/atualizar-site.yml   atualização + publicação no GitHub Pages
 atualizar.bat                          roda o pipeline local e abre o dashboard
 ```
-Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/.
+Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/, data/listados/.
 
 ## Fontes de dados
 - **CVM Dados Abertos:** informe diário (cota, PL, cotistas, fluxos), cadastro RCVM 175 + legado, CDA (carteiras).
 - **BCB SGS 12 (CDI):** API `api.bcb.gov.br`; se cair, fallback `www3.bcb.gov.br/sgspub` (validado: 0 divergências).
 - **Ibovespa:** Yahoo (^BVSP) — série do BCB descontinuada. IMA-B, IMA-B5, IFIX, SMLL, IPCA+Yield IMA-B: sem série → N/D (sem proxy).
+- **Fundos listados (B3):** COTAHIST (preço/volume diário; anual p/ anos fechados, mensal+diário no ano corrente);
+  API `sistemaswebb3-listados.b3.com.br/fundsListedProxy/Search/` (GetListFunds por tipo, GetDetailFund → CNPJ/ticker,
+  GetEventsCorporateActions → proventos dos últimos 365 dias + desdobramentos/grupamentos completos);
+  Fundos.NET (`fnet.bmfbovespa.com.br`, categoria 14 / tipo 41 "Rendimentos e Amortizações", XML estruturado) para FII/Fiagro
+  antes da janela da B3 — servidor lento (~1 s/aviso, ~30% de timeouts transitórios → timeout curto + 6 tentativas);
+  CVM informe mensal FII (anual) e Fiagro (mensal) p/ PL, VP/cota, cotistas, segmento. FI-Infra e ETFs NÃO estão no
+  Fundos.NET → proventos só desde 08/10/2025 (1ª coleta − 365 d), crescendo a cada execução. Yahoo testado e descartado
+  (faltavam pagamentos).
 - **Material comercial Itaú** (fotos): categoria, estratégia, taxas, cotização, alvos, público → planilha-base.
 
 ## Regras e decisões principais
@@ -45,6 +57,17 @@ Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/.
   aberto, em funcionamento, PL ≥ R$10 mi; não exclusivo e ≥100 cotistas, EXCETO previdência (FIE: cotista = seguradora).
   Mesma metodologia; sem dados comerciais (N/D). Selos MERCADO/PREV, filtro "Só previdência". Não entram no HTML único.
 - Página Fundos/Visão geral/Análise = só planilha-base. Comparação sem limite de fundos (8 cores + linha tracejada/pontilhada).
+- **Fundos listados (~587: FII 349, ETF 161, Fiagro 41, FI-Infra 36):** ids `l:TICKER`; entram se negociaram no último mês.
+  Retorno total = preço ajustado + proventos reinvestidos na data ex; série começa na data a partir da qual TODOS os proventos
+  são conhecidos (`renda.cobertura`); antes = N/D. Eventos de cotas conferidos com o salto de preço (tolerância 30%); salto
+  > 50% sem evento corta a série. DY = proventos (data-com) ÷ preço no início do período; DY 12M atual ÷ preço na data-base.
+  P/VP com VP da CVM ajustado a eventos; fora de 0,1–10 → N/D. Sem benchmark (IFIX indisponível): referência = CDI.
+  COTAHIST: BDI 12 (FII), 13 (Fiagro até out/2025) e 14 (demais). ETF sem nenhum provento na B3 → série = variação da
+  cota (`base_ret: "preco"`, aviso ETF_BASE_PRECO). Fundos.NET completo desde 2022-07 (15,4 mil avisos, out/2026).
+  Fundos.NET com orçamento de tempo por execução (`LISTADOS["fnet_orcamento_min"]`, 20 min); mês só coberto com avisos
+  de m−1, m, m+1 completos.
+- **Página Renda** (`#/renda`, seleção própria `rendaSel`): ranking + quadro de renda, proventos mês a mês, R$100,
+  simulador de carteira de renda (R$ por fundo → renda mensal por fundo/carteira, 12M, `rdAlloc`), simulação de renda vs CDI, tabelas mês a mês/ano a ano, últimos proventos. Botão envia os fundos para a Comparação.
 - Data-base atual publicada: 30/09/2026.
 
 ## Achados de qualidade conhecidos
@@ -73,5 +96,7 @@ Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/.
 - Nunca pedir/usar senhas; o usuário faz os logins (GitHub etc.) por conta própria.
 
 ## Ideias pendentes / próximos passos sugeridos
+- Histórico de proventos de FI-Infra/ETF anterior a out/2025: sem fonte oficial estruturada encontrada (só cresce daqui
+  pra frente). Avaliar comunicados do administrador (texto livre) — exigiria validação manual.
 - Benchmarks ANBIMA (IMA-B etc.) via ANBIMA Data; FIDCs via informe mensal; ETFs/fundos listados (B3).
 - Histórico > 48 meses; classificação de risco da lâmina; controle de acesso se deixar de ser público.
