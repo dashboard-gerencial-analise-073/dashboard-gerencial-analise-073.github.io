@@ -39,15 +39,22 @@ com a planilha-base. A base de mercado (~95 MB em `dashboard/data/mercado/`) fun
 **Fundos listados (ETFs, FII, Fiagro, FI-Infra):** a busca da *Comparação* também encontra ~580 fundos negociados na B3
 (por ticker, nome ou CNPJ). Para eles, a rentabilidade é o **retorno total**: preço de fechamento + proventos reinvestidos.
 
+**Página *Carteiras*:** monte uma ou mais carteiras (qualquer fundo: prateleira, mercado ou listado), defina o % de
+cada fundo e compare o retorno no ano, em 12M e 24M (e 24M a.a.), volatilidade e queda máxima em 12M, evolução de R$ 100 e
+contribuição de cada fundo. Compra no início do período com os pesos informados, sem rebalancear, custos ou impostos.
+As carteiras ficam salvas no navegador; **Copiar link** e **Exportar/Importar** levam-nas para outro computador ou colega,
+e **Relatório (PDF)** imprime a página. O link sempre mostra os dados da data-base mais recente.
+
+**Página *Comparação*:** tabelas *Rentabilidade por prazo* e *mês a mês* com fundos nas linhas e prazos/meses nas colunas;
+★ marca o maior valor de cada coluna. **Copiar link** guarda a seleção de fundos num endereço.
+
 **Página *Renda*:** comparação de fundos listados que pagam rendimentos (FII, Fiagro, FI-Infra e ETFs que distribuem):
-- ranking filtrável (tipo, segmento, liquidez, "pagou nos 12 meses") com DY 12M, proventos, regularidade, variação da
-  cota, retorno total, P/VP, liquidez e PL;
-- **simulador de carteira de renda**: informe quanto aplicar em cada fundo marcado (R$ X no fundo A, R$ Y no B…) e veja a
-  renda mensal por fundo e da carteira — último mês, média, menor/maior mês, mês a mês nos últimos 12 meses (gráfico
-  empilhado) e o CDI sobre o mesmo valor como referência;
-- para os fundos marcados: quadro de renda, gráfico de proventos mês a mês (DY ou R$/cota), evolução de R$ 100 (retorno
-  total ou só a cota), simulação de renda ("R$ X investidos há N meses") contra o CDI, tabelas mês a mês e ano a ano
-  (DY, provento, variação da cota, retorno total) e últimos pagamentos.
+- ranking filtrável (tipo, segmento, liquidez, "pagou nos 12 meses") com DY 12M, proventos, variação da cota, retorno total,
+  P/VP e liquidez;
+- para os fundos marcados: resumo; **simulação de renda mensal** (R$ por fundo → renda mensal por fundo e da carteira nos
+  últimos 12 meses, contra o CDI); **histórico de distribuição de proventos** (desde jul/2022 para FII/Fiagro); **histórico da
+  cota** (preço, volatilidade móvel de 3 meses, queda desde o pico); **rentabilidade mês a mês** em formato de lâmina
+  (ano × mês: retorno total, variação da cota ou DY).
 
 Fontes: preço da B3 (COTAHIST); proventos dos eventos corporativos da B3 (12 meses, acumulados a cada atualização) e,
 antes disso, dos avisos aos cotistas do Fundos.NET (FII/Fiagro); PL, VP e cotistas da CVM. Período sem histórico oficial de

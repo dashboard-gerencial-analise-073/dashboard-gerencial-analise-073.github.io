@@ -8,6 +8,10 @@
   let period = App.store.get("cmpPeriod", "common");
   let rootRef = null;
   let onlyPrev = App.store.get("cmpOnlyPrev", false);
+  let rentBase = App.store.get("cmpRentBase", "cum");
+  const STAR = '<span class="best" title="Maior rentabilidade da coluna entre os fundos selecionados">★</span>';
+  /* Maior valor numérico (null se não houver ao menos 2 valores para comparar). */
+  const bestOf = (vals) => { const v = vals.filter((x) => x != null && isFinite(x)); return v.length >= 2 ? Math.max(...v) : null; };
   const PREV_BADGE = '<span class="badge prev" title="Fundo de previdência (PGBL/VGBL)">PREV</span>';
   App.on("selection", () => { if (rootRef && document.body.contains(rootRef) && (location.hash.split("/")[1] || "") === "comparacao") render(rootRef); });
 
@@ -16,7 +20,13 @@
   const NA_LST = "Fundo listado: compra e venda em bolsa (mercado secundário); taxas e regras no regulamento do fundo";
 
   const tried = new Set(); // ids já procurados nas bases externas (evita recarregar quem não existe mais)
-  function render(root) {
+  function render(root, params) {
+    // Link compartilhado: #/comparacao/<ids separados por vírgula> substitui a seleção atual.
+    if (params && params[0]) {
+      const ids = params[0].split(",").map((x) => x.trim()).filter((id) => App.byId[id] || /^[ml]:/.test(id));
+      if (ids.length) { App.clearSelection(); ids.forEach((id) => App.toggleSelect(id, true)); }
+      history.replaceState(null, "", "#/comparacao");
+    }
     const ids = App.state.selection.slice();
     const pending = ids.filter((id) => !App.getFund(id));
     if (pending.length && pending.some((id) => !App.extFailed(id) && !tried.has(id))) {
@@ -37,7 +47,7 @@
           <div class="ac" id="ac"><input class="input" id="ac-in" type="search" placeholder="Adicionar fundo por nome ou CNPJ…" autocomplete="off" aria-label="Adicionar fundo à comparação"><div class="ac-list hidden" id="ac-list" role="listbox"></div></div>
           <label class="f-check small" title="Mostrar apenas fundos de previdência (PGBL/VGBL) na busca"><input type="checkbox" id="only-prev" ${onlyPrev ? "checked" : ""}> Só previdência</label>
           <div class="chips" id="sel-chips">${sel.map((f) => `<span class="chip" style="display:inline-flex;align-items:center;gap:6px">${App.swatch(f.id)}${f.listado ? `<span title="${esc(f.cvm.denominacao || "")}">${esc(f.nome)}</span> ${LST_BADGE(f.tipo)}` : f.mercado ? `<span title="${esc(f.cvm.denominacao)}">${esc(f.nome)}</span> ${MKT_BADGE}${f.previdencia ? " " + PREV_BADGE : ""}` : `<a href="#/fundo/${f.id}" style="color:inherit;text-decoration:none">${esc(f.nome)}</a>`}<button type="button" data-rm="${f.id}" style="border:0;background:none;padding:0 0 0 4px;color:var(--muted)" aria-label="Remover ${esc(f.nome)}">×</button></span>`).join("")}</div>
-          ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button>' : ""}
+          ${sel.length ? '<button class="btn ghost" type="button" id="btn-clear">Limpar seleção</button> <button class="btn" type="button" id="btn-link" title="Copiar um link que abre esta mesma comparação (para salvar ou enviar)">Copiar link</button>' : ""}
         </div>
       </div></div>
       ${missing.length ? `<div class="warn-note" style="margin-top:12px">Não foi possível carregar ${missing.length} fundo(s) (${missing.map((id) => esc(App.fundName(id))).join(", ")}): ${esc(App.extError(missing[0]) || "fundo fora da base nesta data-base")}. As bases de mercado e de fundos listados estão disponíveis no site e no painel local (dashboard/index.html), não no relatório em arquivo único. <a href="#" data-drop-missing>Remover da seleção</a></div>` : ""}
@@ -49,6 +59,7 @@
     bindAc(root);
     root.querySelector("#sel-chips").addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (b) App.toggleSelect(b.dataset.rm, false); });
     const bc = root.querySelector("#btn-clear"); if (bc) bc.addEventListener("click", () => App.clearSelection());
+    const bl = root.querySelector("#btn-link"); if (bl) bl.addEventListener("click", () => App.copyLink("#/comparacao/" + App.state.selection.map(encodeURIComponent).join(",")));
     rootRef = root;
 
     const body = root.querySelector("#cmp-body");
@@ -138,10 +149,14 @@
         <div class="card"><div class="card-h"><h3>Rentabilidade por janela</h3><span class="sub">Acumulada até a data-base</span></div><div class="card-b"><div class="chart" id="ch-win"></div></div><div class="card-note">Barras ausentes = N/D (histórico insuficiente).</div></div>
         <div class="card"><div class="card-h"><h3>Correlação dos retornos diários</h3><span class="sub">Período selecionado</span></div><div class="card-b"><div class="chart" id="ch-corr"></div></div><div class="card-note">Correlação de Pearson dos retornos diários em datas comuns (mínimo de 60 observações). −1 a +1.</div></div>
       </div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Rentabilidade por prazo</h3>
+          <div class="seg no-print" id="rent-base" role="group"><button type="button" data-v="cum">Acumulada</button><button type="button" data-v="ann">Anualizada (≥ 12M)</button></div></div>
+        <div class="table-wrap" style="max-height:none"><table class="data cmp-table rent-table" id="cmp-rent"></table></div>
+        <div class="card-note">★ = maior rentabilidade de cada prazo entre os fundos selecionados (indica só o maior número da coluna, não o fundo mais adequado: considere risco, liquidez e objetivo). Benchmarks em cinza, fora da marcação. Até ${fmt.date(App.meta.data_base)}.</div></div>
       <div class="card" style="margin-top:16px"><div class="card-h"><h3>Quadro comparativo</h3><span class="sub">Janela de risco: ${App.W[App.state.riskWin].label} (altere na página Fundos)</span></div>
         <div class="table-wrap" style="max-height:none"><table class="data cmp-table" id="cmp-table"></table></div>
         <div class="card-note">Valores lado a lado, sem destaque de "melhor" ou "pior": a leitura depende do objetivo e do perfil de cada investidor.</div></div>
-      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Rentabilidade mês a mês</h3><span class="sub">Últimos 12 meses · * mês corrente até ${fmt.date(App.meta.data_base)}</span></div>
+      <div class="card" style="margin-top:16px"><div class="card-h"><h3>Rentabilidade mês a mês</h3><span class="sub">Últimos 12 meses · ★ maior do mês · * mês da data-base, até ${fmt.date(App.meta.data_base)}</span></div>
         <div class="table-wrap" style="max-height:none"><table class="data cmp-table" id="cmp-monthly"></table></div>
         <div class="card-note">Fim de mês a fim de mês, pelas cotas da CVM. Histórico completo na aba “Rentabilidade mensal” de cada fundo.</div></div>`;
 
@@ -200,18 +215,32 @@
     }
 
     // Rentabilidade mês a mês (últimos 12 meses)
-    const mkeys = [...new Set(sel.flatMap((f) => Object.keys(f.mensal || {})))].sort().slice(-12).reverse();
+    const mkeys = [...new Set(sel.flatMap((f) => Object.keys(f.mensal || {})))].sort().slice(-12);
     const benchCols = benches.filter((b) => App.benchAvailable(b));
     const benchMonthly = (b, k) => { const f = sel.find((x) => x.benchmark_id === b && x.mensal && x.mensal[k] && x.mensal[k][1] != null); return f ? f.mensal[k][1] : null; };
-    body.querySelector("#cmp-monthly").innerHTML = `<thead><tr><th class="l">Mês</th>${sel.map((f) => `<th>${App.swatch(f.id)}${esc(f.nome)}</th>`).join("")}${benchCols.map((b) => `<th style="color:var(--muted)">${esc(App.benchName(b))}</th>`).join("")}</tr></thead><tbody>` +
-      mkeys.map((k) => `<tr style="cursor:default"><td class="l">${fmt.monthLabel(k)}${App.meta.data_base.slice(0, 7) === k ? "*" : ""}</td>${sel.map((f) => `<td>${f.mensal && f.mensal[k] ? App.cell(f.mensal[k][0], "pct", "") : '<span class="muted">—</span>'}</td>`).join("")}${benchCols.map((b) => { const v = benchMonthly(b, k); return `<td>${v == null ? '<span class="muted">—</span>' : App.cell(v, "pct", "", { color: false })}</td>`; }).join("")}</tr>`).join("") + "</tbody>";
+    const mval = (f, k) => (f.mensal && f.mensal[k] ? f.mensal[k][0] : null);
+    const mbest = Object.fromEntries(mkeys.map((k) => [k, bestOf(sel.map((f) => mval(f, k)))]));
+    body.querySelector("#cmp-monthly").innerHTML = `<thead><tr><th class="l">Fundo</th>${mkeys.map((k) => `<th>${fmt.monthLabel(k)}${App.meta.data_base.slice(0, 7) === k ? "*" : ""}</th>`).join("")}</tr></thead><tbody>` +
+      sel.map((f) => `<tr style="cursor:default"><td class="l fund-cell">${App.swatch(f.id)}${esc(f.nome)}</td>${mkeys.map((k) => { const v = mval(f, k); return `<td>${v == null ? '<span class="muted">—</span>' : App.cell(v, "pct", "") + (v === mbest[k] ? STAR : "")}</td>`; }).join("")}</tr>`).join("") +
+      benchCols.map((b) => `<tr class="bench-row" style="cursor:default"><td class="l">${esc(App.benchName(b))}</td>${mkeys.map((k) => { const v = benchMonthly(b, k); return `<td>${v == null ? '<span class="muted">—</span>' : App.cell(v, "pct", "", { color: false })}</td>`; }).join("")}</tr>`).join("") + "</tbody>";
+
+    // Rentabilidade por prazo: fundos nas linhas, janelas nas colunas; ★ no maior valor de cada coluna.
+    const drawRent = () => {
+      const ann = rentBase === "ann";
+      const wins = App.windows.filter((w) => !ann || (w.type === "months" && w.n >= 12));
+      const val = (f, w) => { const r = f.ret[w.id] || {}; return ann ? r.fa : r.f; };
+      const best = Object.fromEntries(wins.map((w) => [w.id, bestOf(sel.map((f) => val(f, w)))]));
+      body.querySelectorAll("#rent-base button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === rentBase)));
+      body.querySelector("#cmp-rent").innerHTML = `<thead><tr><th class="l">Fundo</th>${wins.map((w) => `<th title="${esc(w.long)}">${esc(w.label)}${ann ? " a.a." : ""}</th>`).join("")}</tr></thead><tbody>` +
+        sel.map((f) => `<tr style="cursor:default"><td class="l fund-cell">${App.swatch(f.id)}${esc(f.nome)}${f.mercado ? " " + MKT_BADGE : ""}${f.listado ? " " + LST_BADGE(f.tipo) : ""}</td>${wins.map((w) => { const v = val(f, w); return `<td>${App.cell(v, "pct", (f.ret[w.id] || {}).nd)}${v != null && v === best[w.id] ? STAR : ""}</td>`; }).join("")}</tr>`).join("") +
+        benchCols.map((b) => `<tr class="bench-row" style="cursor:default"><td class="l">${esc(App.benchName(b))}</td>${wins.map((w) => `<td>${App.cell(App.benchWindowReturn(b, w.id, ann), "pct", "Sem dado do índice", { color: false })}</td>`).join("")}</tr>`).join("") + "</tbody>";
+    };
+    body.querySelector("#rent-base").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; rentBase = b.dataset.v; App.store.set("cmpRentBase", rentBase); drawRent(); });
+    drawRent();
 
     // Quadro comparativo
     const rw = App.state.riskWin;
     const rows = [
-      ["Rentabilidade", null],
-      ...App.windows.map((w) => [`${w.label}`, (f) => App.cell((f.ret[w.id] || {}).f, "pct", (f.ret[w.id] || {}).nd)]),
-      ...App.windows.filter((w) => w.type === "months" && w.n >= 24).map((w) => [`${w.label} anualizada`, (f) => App.cell((f.ret[w.id] || {}).fa, "pct", (f.ret[w.id] || {}).nd)]),
       ["Benchmark", null],
       ["Benchmark", (f) => (f.benchmark_id ? esc(App.benchName(f.benchmark_id)) + (f.mercado ? ' <span class="small muted">(indicador CVM)</span>' : "") : f.listado ? App.ND("Fundo listado: sem benchmark com série pública (ex.: IFIX não disponível). Compare com o CDI.") : App.ND(`Indicador informado à CVM: ${f.indicador_cvm || "não informado"} — sem série pública`))],
       ...(sel.some((f) => f.listado) ? [

@@ -190,6 +190,13 @@
     const c = ((f && f.renda) || {}).cobertura;
     return c ? `Histórico oficial de proventos completo apenas para data-com a partir de ${App.fmt.date(c)} (B3: janela de 12 meses, acumulada a cada atualização)` : "Proventos não disponíveis";
   };
+  /* Copia para a área de transferência um link do painel com o estado codificado no endereço (#/…). */
+  App.copyLink = function (hash) {
+    const url = location.href.split("#")[0] + hash;
+    const ok = () => App.toast("Link copiado — cole no navegador para reabrir (dados sempre da data-base mais recente)");
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(url).then(ok, () => window.prompt("Copie o link:", url));
+    else window.prompt("Copie o link:", url);
+  };
   App.toast = function (msg) {
     let t = document.getElementById("toast");
     if (!t) {

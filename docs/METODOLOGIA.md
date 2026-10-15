@@ -151,6 +151,16 @@ correlação é calculada sob demanda na página de comparação.
   ano), carregados sob demanda. Também vão para as abas `Listados_Renda` e `Listados_Proventos` da planilha consolidada. Não
   são embutidos no HTML único.
 
+## 9b. Carteiras simuladas (página Carteiras) — `dashboard/assets/js/views/carteiras.js`
+
+- Pesos informados pelo usuário, normalizados para 100%. Compra no fechamento do início da janela (ano: 31/12 anterior;
+  12M/24M: data-base − N meses), mantendo as cotas até a data-base: `V(t) = Σ peso_i × Cota_i(t) / Cota_i(início)`;
+  retorno = V(data-base) − 1. Sem rebalanceamento, custos, impostos ou come-cotas.
+- Cotas: informe diário da CVM (prateleira e mercado) ou retorno total na B3 (listados). Cota inicial aceita até 5 dias
+  úteis antes; fundo sem histórico no início da janela deixa a carteira N/D nessa janela (o peso não é redistribuído).
+- Volatilidade (√252) e queda máxima calculadas sobre V(t) diário na janela de 12M; contribuição = peso inicial × retorno
+  do fundo (soma = retorno da carteira).
+
 ## 10. Tratamento de dados
 
 - Nada é interpolado, estimado ou preenchido. Cota 0 reportada à CVM = ausente.

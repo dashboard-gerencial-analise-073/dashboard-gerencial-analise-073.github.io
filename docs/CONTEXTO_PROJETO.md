@@ -66,7 +66,13 @@ Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/, d
   cota (`base_ret: "preco"`, aviso ETF_BASE_PRECO). Fundos.NET completo desde 2022-07 (15,4 mil avisos, out/2026).
   Fundos.NET com orçamento de tempo por execução (`LISTADOS["fnet_orcamento_min"]`, 20 min); mês só coberto com avisos
   de m−1, m, m+1 completos.
-- **Página Renda** (`#/renda`, seleção própria `rendaSel`): ranking + quadro de renda, proventos mês a mês, R$100,
+- **Página Carteiras** (`#/carteiras`, `views/carteiras.js`): várias carteiras (store `carteiras`), % por fundo (qualquer
+  origem), Ano/12M/24M/24M a.a./vol/queda máx 12M, R$100, contribuição; buy-and-hold sem rebalancear. Link
+  `#/carteiras/<base64url>` importa; Exportar/Importar JSON; Relatório = window.print(). Sem login (site estático).
+- **Comparação**: tabela "Rentabilidade por prazo" e mês a mês com fundos nas linhas e ★ no maior da coluna;
+  link `#/comparacao/<ids,…>`.
+- **Página Renda** (`#/renda`, seleção própria `rendaSel`; enxugada em out/2026): resumo, simulação de renda mensal,
+  histórico de proventos, cota/volatilidade móvel 63 pregões/drawdown, lâmina mês a mês. Antes: ranking + quadro de renda, proventos mês a mês, R$100,
   simulador de carteira de renda (R$ por fundo → renda mensal por fundo/carteira, 12M, `rdAlloc`), simulação de renda vs CDI, tabelas mês a mês/ano a ano, últimos proventos. Botão envia os fundos para a Comparação.
 - Data-base atual publicada: 30/09/2026.
 

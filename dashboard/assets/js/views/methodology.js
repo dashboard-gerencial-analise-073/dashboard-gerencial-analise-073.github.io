@@ -102,6 +102,13 @@ Information ratio = (Retorno a.a. fundo − Retorno a.a. índice) / Tracking err
             <li>Fundos listados não têm benchmark com série pública (IFIX, IMA-B etc. não estão disponíveis): a referência exibida é o CDI no mesmo período. Valores brutos de IR, corretagem e emolumentos.</li>
           </ul>
 
+          <h3>Carteiras simuladas (página Carteiras)</h3>
+          <ul>
+            <li>Pesos informados (normalizados para 100%), compra no fechamento do início do período e cotas mantidas até a data-base, sem rebalancear, sem custos e sem impostos: <span class="formula">V(t) = Σ peso × Cota(t) / Cota(início)        Retorno = V(data-base) − 1</span></li>
+            <li>Fundo sem cota no início do período deixa a carteira N/D naquele período (o peso não é redistribuído). Volatilidade e queda máxima sobre o valor diário da carteira em 12 meses.</li>
+            <li>As carteiras ficam salvas no próprio navegador; o link e o arquivo exportado guardam só fundos e pesos — os números são sempre recalculados com a data-base mais recente.</li>
+          </ul>
+
           <h3>Tratamento de dados</h3>
           <ul>
             <li><b>Calendário</b>: dias úteis definidos pelas datas da série do CDI (BCB), o que exclui feriados nacionais. Cotas em datas fora do calendário são ignoradas e registradas.</li>

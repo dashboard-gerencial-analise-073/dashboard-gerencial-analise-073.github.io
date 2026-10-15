@@ -328,3 +328,8 @@ footer b { color: var(--text-2); font-weight: 600; }
 
 .legend-line { display: inline-block; width: 16px; height: 0; margin-right: 6px; vertical-align: 3px; }
 .tray .it .legend-dot, .tray .it .legend-line { margin-right: 0; }
+
+/* Destaque do maior valor da coluna (Comparação) e linhas de referência */
+.best { color: #b07d00; font-size: 12px; margin-left: 3px; cursor: help; }
+table.data tr.bench-row td { color: var(--text-2); background: var(--surface-2); }
+.cmp-table td.fund-cell { white-space: normal; min-width: 200px; text-align: left; }
