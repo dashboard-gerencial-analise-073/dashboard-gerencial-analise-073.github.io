@@ -26,6 +26,7 @@ import quality  # noqa: E402
 from util import add_months, format_cnpj, iso, last_business_day_on_or_before, log, only_digits  # noqa: E402
 
 MARKET_SERIES = {"nivel"}  # tipo_serie de índices de mercado (beta/TE fazem sentido)
+CART_SHARDS = 32  # lotes de carteiras (CDA) carregados sob demanda pelo dashboard
 
 
 def rnd(x, n=8):
@@ -233,6 +234,7 @@ def main():
 
     log("4/6 Calculando indicadores…")
     out_funds = []
+    cart_by_id = {}
     for f in fundos:
         c = only_digits(f["cnpj"])
         rows = {d: r for d, r in daily.get(c, {}).items() if r["q"] > 0}
@@ -276,8 +278,11 @@ def main():
             for k in ("ultima", "completa"):
                 if cart.get(k):
                     cart[k]["top_direta"] = cart[k]["top_direta"][:15]
+        cart_by_id[f["id"]] = cart
         out_funds.append({
-            "carteira": cart,
+            # Carteira (CDA) vai para lotes carregados sob demanda (data/carteiras): mantém o dataset leve.
+            "carteira_lote": (len(out_funds) % CART_SHARDS) if cart else None,
+            "status": f.get("status_captacao"), "origem": f.get("origem_distribuicao"), "secao": f.get("secao_mapa"),
             "id": f["id"], "nome": f["nome"], "cnpj": format_cnpj(f["cnpj"]), "gestora_id": f["gestora_id"],
             "categoria": f["categoria"], "familia": f.get("familia"), "estrutura": f.get("estrutura"),
             "benchmark_id": bid, "alvo_tipo": f.get("alvo_tipo"), "alvo": f.get("alvo"),
@@ -335,6 +340,17 @@ def main():
     config.DATASET_JS.write_text("/* Gerado por pipeline/build.py — não editar manualmente. */\nwindow.FUNDS_DATASET=" + payload + ";\n", encoding="utf-8")
     log(f"  {config.DATASET_JS} ({len(payload) / 1e6:.2f} MB)")
     # Configuração do site: versão local sem downloads (o GitHub Actions sobrescreve na publicação).
+    # Carteiras em lotes: window.__CART_SHARD(n, {id: carteira})
+    cart_dir = config.DATASET_JS.parent / "carteiras"
+    cart_dir.mkdir(exist_ok=True)
+    for old in cart_dir.glob("*.js"):
+        old.unlink()
+    lotes = {}
+    for f in dataset["fundos"]:
+        if f.get("carteira_lote") is not None:
+            lotes.setdefault(f["carteira_lote"], {})[f["id"]] = clean(cart_by_id[f["id"]])
+    for n, d in lotes.items():
+        (cart_dir / f"{n:03d}.js").write_text(f"window.__CART_SHARD({n},{json.dumps(d, ensure_ascii=False, separators=(',', ':'))});\n", encoding="utf-8")
     site_js = "window.SITE_CONFIG = window.SITE_CONFIG || {downloads: false};\n"
     (config.DATASET_JS.parent / "site.js").write_text(site_js, encoding="utf-8")
 

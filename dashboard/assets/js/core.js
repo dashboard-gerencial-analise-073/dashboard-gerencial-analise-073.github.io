@@ -181,6 +181,11 @@
   App.ensureFunds = (ids) => Promise.allSettled([mkt.ensure(ids), lst.ensure(ids)]);
   App.extFailed = (id) => (String(id).startsWith("l:") ? lst : mkt).failed;
   App.extError = (id) => (String(id).startsWith("l:") ? lst : mkt).error;
+  /* Carteiras (CDA) dos fundos da prateleira: lotes data/carteiras/NNN.js (embutidos no arquivo único). */
+  const cartLoaded = {};
+  window.__CART_SHARD = (n, d) => { cartLoaded[n] = true; Object.entries(d).forEach(([id, c]) => { if (App.byId[id]) App.byId[id].carteira = c; }); };
+  App.loadCarteira = (f) => (f.carteira !== undefined || f.carteira_lote == null || cartLoaded[f.carteira_lote] ? Promise.resolve()
+    : loadScript(`data/carteiras/${String(f.carteira_lote).padStart(3, "0")}.js`)).then(() => { if (f.carteira === undefined) f.carteira = null; });
   App.getFund = (id) => App.byId[id] || mkt.funds[id] || lst.funds[id] || null;
   App.rememberName = (id, nome) => { const m = store.get("mktNames", {}); m[id] = nome; store.set("mktNames", m); };
   App.fundName = (id) => (App.getFund(id) || {}).nome || store.get("mktNames", {})[id] || (String(id).startsWith("l:") ? String(id).slice(2) : String(id).replace(/^m:/, "CNPJ "));
@@ -282,6 +287,16 @@
     return { abs: "Rentabilidade", excess: "Excesso sobre o benchmark", pctb: "% do benchmark" }[App.state.retMode] + base;
   };
 
+  /* Status de captação (Mapa de Fundos): ABERTO, ABERTO | Calendário, ABERTO | Investfone, FECHADO, INIBIDO. */
+  const STATUS = {
+    FECHADO: ["closed", "FECHADO", "Fechado para novas aplicações (resgates seguem o regulamento)"],
+    INIBIDO: ["closed", "INIBIDO", "Fundo inibido para novas aplicações na distribuição"],
+    "ABERTO | CALENDÁRIO": ["cal", "CALENDÁRIO", "Aberto para aplicações apenas em datas definidas (calendário)"],
+    "ABERTO | INVESTFONE": ["cal", "INVESTFONE", "Aplicações apenas pelo Investfone"],
+  };
+  App.statusInfo = (f) => STATUS[String((f && f.status) || "").toUpperCase()] || null;
+  App.statusBadge = (f) => { const s = App.statusInfo(f); return s ? `<span class="badge ${s[0]}" title="${s[2]}">${s[1]}</span> ` : ""; };
+  App.statusText = (f) => (f && f.status ? (App.statusInfo(f) || [null, null, "Aberto para aplicações"])[2] : null);
   /* Liquidez em texto: "D0 / D+21 / D+22" (aplicação / cotização resgate / crédito) */
   App.liquidityText = (f) => {
     const p = (n) => (n == null ? "N/D" : n === 0 ? "D0" : "D+" + n);
@@ -293,5 +308,6 @@
     (f.qualificado ? '<span class="badge iq" title="Destinado a investidores qualificados">IQ</span> ' : "") +
     (f.previdencia ? '<span class="badge prev" title="Estratégia disponível em versão previdenciária">PREV</span> ' : "") +
     (f.isento_ir ? '<span class="badge isento" title="Rendimentos isentos de IR para pessoa física">ISENTO</span> ' : "") +
+    App.statusBadge(f) +
     ((f.qc || []).some((q) => q.nivel !== "info") ? '<span class="badge warn" title="Há alertas de qualidade de dados — ver detalhes do fundo">!</span>' : "");
 })();

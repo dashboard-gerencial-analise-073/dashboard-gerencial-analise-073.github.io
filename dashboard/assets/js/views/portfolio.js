@@ -13,6 +13,14 @@
   }
 
   App.renderCarteira = function (el, f) {
+    // Carteiras ficam em lotes carregados sob demanda (data/carteiras/NNN.js).
+    if (f.carteira === undefined && f.carteira_lote != null) {
+      el.innerHTML = `<div class="card empty" style="margin-top:16px"><h3>Carregando carteira…</h3></div>`;
+      App.loadCarteira(f).then(() => App.renderCarteira(el, f), () => {
+        el.innerHTML = `<div class="card empty" style="margin-top:16px"><h3>Carteira indisponível nesta versão</h3><p class="small muted">Não foi possível carregar o arquivo da carteira. Gere o relatório novamente (atualizar.bat).</p></div>`;
+      });
+      return;
+    }
     const c = f.carteira;
     if (!c || !c.ultima) {
       el.innerHTML = `<div class="card empty" style="margin-top:16px"><h3>Carteira não disponível</h3>

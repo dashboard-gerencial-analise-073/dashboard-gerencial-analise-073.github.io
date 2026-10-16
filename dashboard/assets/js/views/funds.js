@@ -35,6 +35,8 @@
     { id: "estrutura", type: "multi", label: "Estrutura de gestão", get: (f) => f.estrutura, options: () => uniq(App.funds.map((f) => f.estrutura)).sort() },
     { id: "familia", type: "multi", label: "Família / estratégia", scroll: true, get: (f) => f.familia, options: () => uniq(App.funds.map((f) => f.familia)).sort((a, b) => a.localeCompare(b, "pt-BR")) },
     { id: "anbima", type: "multi", label: "Classificação ANBIMA (CVM)", scroll: true, get: (f) => (f.cvm && f.cvm.classificacao_anbima) || "N/D", options: () => uniq(App.funds.map((f) => (f.cvm && f.cvm.classificacao_anbima) || "N/D")).sort() },
+    { id: "captacao", type: "seg", label: "Captação", options: [["", "Todos"], ["aberto", "Abertos"], ["fechado", "Fechados / inibidos"], ["cal", "Calendário"]],
+      test: (f, v) => { if (!v) return true; const s = (App.statusInfo(f) || [""])[0]; return v === "aberto" ? !s : v === "fechado" ? s === "closed" : s === "cal"; } },
     { id: "publico", type: "seg", label: "Público-alvo", options: [["", "Todos"], ["geral", "Geral"], ["iq", "Qualificado"]], test: (f, v) => !v || (v === "iq" ? f.qualificado : !f.qualificado) },
     { id: "attrs", type: "flags", label: "Características", options: [["previdencia", "Versão previdência disponível"], ["isento_ir", "Isento de IR (PF)"], ["sem_perf", "Sem taxa de performance"]],
       test: (f, v) => (v || []).every((k) => (k === "sem_perf" ? f.taxa_perf == null : f[k])) },
@@ -53,7 +55,7 @@
   const RANGE_ITEMS = FILTERS.find((f) => f.id === "ranges").items;
   const lbl = (x) => (typeof x === "function" ? x() : x);
 
-  const defaultFilters = () => ({ q: "", categoria: [], gestora: [], benchmark: [], estrutura: [], familia: [], anbima: [], publico: "", attrs: [], hist: "", ranges: {} });
+  const defaultFilters = () => ({ q: "", categoria: [], gestora: [], benchmark: [], estrutura: [], familia: [], anbima: [], captacao: "", publico: "", attrs: [], hist: "", ranges: {} });
   const state = App.state;
   state.filters = Object.assign(defaultFilters(), App.store.get("filters", {}));
   state.sort = App.store.get("sort", { key: "pl", dir: -1 });

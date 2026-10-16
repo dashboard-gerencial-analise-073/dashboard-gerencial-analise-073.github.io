@@ -105,7 +105,7 @@ Information ratio = (Retorno a.a. fundo − Retorno a.a. índice) / Tracking err
           <h3>Carteiras simuladas (página Carteiras)</h3>
           <ul>
             <li>Pesos informados (normalizados para 100%), compra no fechamento do início do período e cotas mantidas até a data-base, sem rebalancear, sem custos e sem impostos: <span class="formula">V(t) = Σ peso × Cota(t) / Cota(início)        Retorno = V(data-base) − 1</span></li>
-            <li>Fundo sem cota no início do período deixa a carteira N/D naquele período (o peso não é redistribuído). Volatilidade e queda máxima sobre o valor diário da carteira em 12 meses.</li>
+            <li>Fundo sem cota no início do período deixa a carteira N/D naquele período (o peso não é redistribuído). Mesmas janelas e fórmulas dos fundos (volatilidade √252, Sharpe vs CDI, drawdown, % de meses positivos e acima do CDI, correlação e mês a mês), aplicadas ao valor diário da carteira.</li>
             <li>As carteiras ficam salvas no próprio navegador; o link e o arquivo exportado guardam só fundos e pesos — os números são sempre recalculados com a data-base mais recente.</li>
           </ul>
 

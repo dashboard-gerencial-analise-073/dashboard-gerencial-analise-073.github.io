@@ -1,7 +1,9 @@
 # Contexto do projeto — Relatório de Fundos (para continuar em outro chat)
 
 ## O que é
-Dashboard de análise e comparação de fundos de investimento (começou com a prateleira da Itaú Asset, 61 fundos).
+Dashboard de análise e comparação de fundos de investimento. Prateleira = Mapa de Fundos do Itaú (out/2026: 731 linhas,
+~625 ativas; encerrados com ativo=0), importado de uma transcrição de fotos (`Mapa_de_Fundos_transcrito.xlsx`); os 61
+fundos originais mantêm os dados comerciais detalhados.
 Pipeline Python gera os dados → dashboard HTML/JS estático. Uso interno e para clientes.
 
 - **Pasta local:** `C:\Users\vinim\OneDrive\Área de Trabalho\Códigos\Relatorio_Fundos`
@@ -56,6 +58,8 @@ Gitignored: data/raw, data/cache, output/, dataset.js, site.js, data/mercado/, d
 - **Fundos de mercado (só na página Comparação):** ~7.164 fundos (2.990 + 4.204 previdência). Recorte em `config.MERCADO`:
   aberto, em funcionamento, PL ≥ R$10 mi; não exclusivo e ≥100 cotistas, EXCETO previdência (FIE: cotista = seguradora).
   Mesma metodologia; sem dados comerciais (N/D). Selos MERCADO/PREV, filtro "Só previdência". Não entram no HTML único.
+- Status de captação (`status_captacao`) → tags FECHADO/INIBIDO/CALENDÁRIO/INVESTFONE (`App.statusBadge`) e filtro
+  Captação. Carteiras CDA fora do dataset: lotes `data/carteiras/NNN.js` (`carteira_lote`), embutidos no HTML único.
 - Página Fundos/Visão geral/Análise = só planilha-base. Comparação sem limite de fundos (8 cores + linha tracejada/pontilhada).
 - **Fundos listados (~587: FII 349, ETF 161, Fiagro 41, FI-Infra 36):** ids `l:TICKER`; entram se negociaram no último mês.
   Retorno total = preço ajustado + proventos reinvestidos na data ex; série começa na data a partir da qual TODOS os proventos

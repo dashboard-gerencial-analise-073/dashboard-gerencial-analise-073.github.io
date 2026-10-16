@@ -135,6 +135,8 @@ main { max-width: 1440px; margin: 0 auto; padding: 24px; }
 .badge.prev { background: #fdebe1; color: #a6461c; }
 .badge.isento { background: var(--lime-soft); color: #4d6410; }
 .badge.warn { background: #fff4d6; color: var(--warn); }
+.badge.closed { background: #fde7e7; color: var(--neg); }
+.badge.cal { background: #fff1db; color: #8a5a00; }
 
 /* ---------- Funds page ---------- */
 .funds-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }

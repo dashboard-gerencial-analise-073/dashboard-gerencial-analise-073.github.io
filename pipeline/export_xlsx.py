@@ -1,5 +1,6 @@
 """Exporta a base consolidada (cadastro + CVM + indicadores + qualidade) para Excel."""
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Font, PatternFill
 
 HDR_FILL = PatternFill("solid", fgColor="0E2A33")
@@ -14,7 +15,8 @@ def _sheet(wb, title, header, rows, formats=None):
     for c in ws[1]:
         c.fill, c.font = HDR_FILL, HDR_FONT
     for r in rows:
-        ws.append(r)
+        # Textos da CVM podem trazer caracteres de controle que o Excel não aceita: são removidos.
+        ws.append([ILLEGAL_CHARACTERS_RE.sub("", v) if isinstance(v, str) else v for v in r])
     ws.freeze_panes = "B2"
     for i, h in enumerate(header, start=1):
         col = ws.cell(row=1, column=i).column_letter

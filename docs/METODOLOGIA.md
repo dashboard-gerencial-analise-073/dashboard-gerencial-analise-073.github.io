@@ -158,8 +158,9 @@ correlação é calculada sob demanda na página de comparação.
   retorno = V(data-base) − 1. Sem rebalanceamento, custos, impostos ou come-cotas.
 - Cotas: informe diário da CVM (prateleira e mercado) ou retorno total na B3 (listados). Cota inicial aceita até 5 dias
   úteis antes; fundo sem histórico no início da janela deixa a carteira N/D nessa janela (o peso não é redistribuído).
-- Volatilidade (√252) e queda máxima calculadas sobre V(t) diário na janela de 12M; contribuição = peso inicial × retorno
-  do fundo (soma = retorno da carteira).
+- Mesmas janelas (datas de início e fim) e fórmulas dos fundos, aplicadas ao valor diário V(t) da carteira: volatilidade
+  (√252), Sharpe vs CDI, máximo drawdown, % de meses positivos e acima do CDI (meses completos), correlação dos retornos
+  diários e rentabilidade mês a mês. Contribuição = peso inicial × retorno do fundo (soma = retorno da carteira).
 
 ## 10. Tratamento de dados
 

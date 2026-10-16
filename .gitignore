@@ -13,3 +13,4 @@ __pycache__/
 ~$*
 dashboard/data/mercado/
 dashboard/data/listados/
+dashboard/data/carteiras/

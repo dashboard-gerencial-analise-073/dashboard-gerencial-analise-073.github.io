@@ -39,9 +39,15 @@ com a planilha-base. A base de mercado (~95 MB em `dashboard/data/mercado/`) fun
 **Fundos listados (ETFs, FII, Fiagro, FI-Infra):** a busca da *Comparação* também encontra ~580 fundos negociados na B3
 (por ticker, nome ou CNPJ). Para eles, a rentabilidade é o **retorno total**: preço de fechamento + proventos reinvestidos.
 
+**Prateleira (planilha-base):** ~625 fundos ativos distribuídos pelo Itaú (Itaú Asset, FoF, Conta e Ordem, Kinea), importados
+do *Mapa de Fundos*; os encerrados ficam com `ativo = 0`. O status de captação aparece como tag — **FECHADO** (fechado para
+novas aplicações), **INIBIDO**, **CALENDÁRIO** (aplicações só em datas definidas) e **INVESTFONE** — e há o filtro *Captação*
+na página Fundos. Taxas, prazos de cotização e descrição dos fundos importados ficam N/D até serem preenchidos.
+
 **Página *Carteiras*:** monte uma ou mais carteiras (qualquer fundo: prateleira, mercado ou listado), defina o % de
-cada fundo e compare o retorno no ano, em 12M e 24M (e 24M a.a.), volatilidade e queda máxima em 12M, evolução de R$ 100 e
-contribuição de cada fundo. Compra no início do período com os pesos informados, sem rebalancear, custos ou impostos.
+cada fundo e compare as carteiras com as mesmas métricas da *Comparação*: rentabilidade por prazo (Mês a 48M, acumulada ou
+anualizada), quadro de risco (volatilidade, Sharpe, drawdown, % de meses positivos e acima do CDI), evolução de R$ 100,
+drawdown, risco × retorno, correlação, mês a mês e contribuição de cada fundo. Compra no início do período com os pesos informados, sem rebalancear, custos ou impostos.
 As carteiras ficam salvas no navegador; **Copiar link** e **Exportar/Importar** levam-nas para outro computador ou colega,
 e **Relatório (PDF)** imprime a página. O link sempre mostra os dados da data-base mais recente.
 

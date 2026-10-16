@@ -91,8 +91,10 @@ LISTADOS = {
 HISTORY_MARGIN_MONTHS = 2
 
 CATEGORY_ORDER = [
-    "Renda Fixa Ativa", "Crédito Privado", "Renda Fixa Ativa Infra",
-    "Debêntures Incentivadas", "Multimercado", "Renda Variável",
+    "Referenciado DI", "Renda Fixa", "Renda Fixa Ativa", "Crédito Privado", "Renda Fixa Ativa Infra",
+    "Debêntures Incentivadas", "Multimercado", "Alocação", "Renda Variável",
+    "Internacional com variação cambial", "Internacional sem variação cambial", "ESG", "Commodities", "Criptomoedas",
+    "FMP-FGTS", "Previdência", "Outros",
 ]
 
 SOURCES = [

@@ -23,6 +23,12 @@ Descrição de cada coluna na aba `Dicionario` da própria planilha. Flags usam 
 Campos numéricos: `cotizacao_aplicacao_d`, `cotizacao_resgate_d`, `liquidacao_resgate_d` (D+),
 `taxa_adm_pct` (% a.a.), `taxa_perf_pct` (% do excedente; vazio = não há), `risco_lamina` (1–5).
 
+Colunas adicionadas com a importação do Mapa de Fundos (aba `Fundos`): `status_captacao` (ABERTO, ABERTO | Calendário,
+ABERTO | Investfone, FECHADO, INIBIDO, ENCERRADO), `origem_distribuicao` (Itaú Asset, FoF, Conta e Ordem, Kinea) e
+`secao_mapa` (seção do mapa). Nos fundos importados, `familia` = estratégia do mapa, `estrutura` = origem e
+`liquidacao_resgate_d` = prazo do mapa (dias); gestor e público vêm do cadastro da CVM e o benchmark do indicador de
+desempenho informado à CVM (`SEM` = sem índice com série pública).
+
 ## Saída — `dashboard/data/dataset.js`
 
 `window.FUNDS_DATASET = { meta, gestoras, benchmarks, eixo, bench_series, fundos, qualidade }`
@@ -52,6 +58,8 @@ Campos numéricos: `cotizacao_aplicacao_d`, `cotizacao_resgate_d`, `liquidacao_r
 | pl_mensal | `{"AAAA-MM": [PL, cotistas]}` no último dia útil do mês. |
 | serie | `{i0, q[]}` — cotas diárias a partir da posição `i0` do eixo. |
 | carteira | `{ultima, completa}` — cada uma: data, pl, conciliacao, n_direta, n_consolidada, sigilo_pct, ajuste_pct, grupos[] e grupos_direta[] (`{grupo, valor, pct}`), top[] e top_direta[] (`{grupo, aplic, tipo, ativo, codigo, emissor, venc, valor, pct}`), fundos_sem_carteira[], fundos_nao_conciliados[]. `completa` só existe quando a última carteira tem > 5% em sigilo. |
+| status, origem, secao | Status de captação, origem e seção do Mapa de Fundos. |
+| carteira_lote | Lote de `dashboard/data/carteiras/NNN.js` com a carteira (carregada sob demanda; embutida no HTML único). |
 | qc[] | Itens de qualidade do fundo. |
 
 Percentuais são frações decimais (0,0123 = 1,23%). Valores monetários em R$.

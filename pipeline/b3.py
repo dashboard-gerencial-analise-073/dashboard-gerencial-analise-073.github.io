@@ -272,10 +272,16 @@ def prices(tickers, start: date, today: date, offline=False):
                 pass  # ainda não publicado
             except Exception as e:  # noqa: BLE001
                 log(f"  aviso: falha ao baixar {nome}: {e}")
-        if not z.exists():
-            return False
         cache = config.CACHE_DIR / f"cotahist_{nome[:-4]}_{key}.json"
-        if cache.exists() and cache.stat().st_mtime >= z.stat().st_mtime:
+        if not z.exists():
+            # Arquivo bruto ausente (ex.: removido pela sincronização de pasta): usa a extração em cache, se houver.
+            if not cache.exists():
+                if not nome.startswith("COTAHIST_D"):  # diários: normal faltar (feriado, ainda não publicado)
+                    log(f"  AVISO: {nome} indisponível (sem arquivo e sem cache) — cotações desse período ficam N/D")
+                return False
+            log(f"  aviso: {nome} ausente em data/raw; usando a extração em cache")
+            part = json.loads(cache.read_text(encoding="utf-8"))
+        elif cache.exists() and cache.stat().st_mtime >= z.stat().st_mtime:
             part = json.loads(cache.read_text(encoding="utf-8"))
         else:
             log(f"  listados: lendo {nome}…")
